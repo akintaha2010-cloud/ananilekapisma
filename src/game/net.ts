@@ -72,10 +72,6 @@ export interface NetCallbacks {
 
 const ID_PREFIX = 'kalekapmaca-';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const ICE: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-];
 
 function randomCode(): string {
   let code = '';
@@ -114,13 +110,14 @@ export class OnlineClient {
     return Boolean(this.room && this.myPeerId && this.room.hostPeerId === this.myPeerId);
   }
 
+  // PeerJS's default ICE config ships public STUN + TURN servers.
   public hasTurnConfigured(): boolean {
-    return false;
+    return true;
   }
 
   private openPeer(id?: string): Promise<Peer> {
     return new Promise((resolve, reject) => {
-      const peer = id ? new Peer(id, { config: { iceServers: ICE } }) : new Peer({ config: { iceServers: ICE } });
+      const peer = id ? new Peer(id) : new Peer();
       const fail = (err: { type?: string }) => {
         peer.destroy();
         reject(err);
