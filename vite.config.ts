@@ -5,6 +5,10 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: './',
+    build: {
+      rollupOptions: { input: path.resolve(__dirname, 'dev.html') },
+    },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
