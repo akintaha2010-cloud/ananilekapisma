@@ -121,6 +121,12 @@ export class CastleRenderer {
   private bgCache: HTMLCanvasElement;
   private bgCacheCtx: CanvasRenderingContext2D;
   private bgCacheMap: MapId | '' = '';
+  private skyCache: HTMLCanvasElement;
+  private skyCacheCtx: CanvasRenderingContext2D;
+  private camX = PW / 2;
+  private camY = PH / 2;
+  private camZoom = 1;
+  private camLastTime = -1;
 
   constructor() {
     this.particles = Array.from({ length: MAX_PARTICLES }, () => ({
@@ -162,6 +168,14 @@ export class CastleRenderer {
     if (!bctx) throw new Error('2D context unavailable for bg cache');
     bctx.imageSmoothingEnabled = false;
     this.bgCacheCtx = bctx;
+
+    this.skyCache = document.createElement('canvas');
+    this.skyCache.width = PW;
+    this.skyCache.height = PH;
+    const sctx = this.skyCache.getContext('2d');
+    if (!sctx) throw new Error('2D context unavailable for sky cache');
+    sctx.imageSmoothingEnabled = false;
+    this.skyCacheCtx = sctx;
   }
 
   public resetParticles() {
@@ -390,10 +404,58 @@ export class CastleRenderer {
     const ctx = this.bgCacheCtx;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, PW, PH);
+    this.drawPixelStaticCastleLayers(ctx, mapId, 'near');
 
-    this.drawPixelSkyBackdrop(ctx, mapId);
-    this.drawPixelStaticCastleLayers(ctx, mapId);
+    const sctx = this.skyCacheCtx;
+    sctx.imageSmoothingEnabled = false;
+    sctx.clearRect(0, 0, PW, PH);
+    this.drawPixelSkyBackdrop(sctx, mapId);
+    this.drawPixelStaticCastleLayers(sctx, mapId, 'far');
     return this.bgCache;
+  }
+
+  /** Dynamic camera: follows the action (humans weighted), zooms in when fighters are close. */
+  private updateCamera(sim: SimulationState, timeSec: number, attractMode: boolean) {
+    const dt = this.camLastTime < 0 ? 1 : Math.min(0.1, Math.max(0, timeSec - this.camLastTime));
+    this.camLastTime = timeSec;
+    const k = PW / ARENA_WIDTH;
+    let sx = 0;
+    let sy = 0;
+    let wsum = 0;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const p of sim.players) {
+      if (!p.alive || p.eliminated) continue;
+      const cx = (p.x + p.w / 2) * k;
+      const cy = (p.y + p.h / 2) * k;
+      const w = p.isBot ? 1 : 2.5;
+      sx += cx * w;
+      sy += cy * w;
+      wsum += w;
+      if (cx < minX) minX = cx;
+      if (cx > maxX) maxX = cx;
+      if (cy < minY) minY = cy;
+      if (cy > maxY) maxY = cy;
+    }
+    let tx = PW / 2;
+    let ty = PH / 2;
+    let tz = 1;
+    if (!attractMode && wsum > 0) {
+      tx = sx / wsum;
+      ty = sy / wsum + 18;
+      const spread = Math.max((maxX - minX + 120) / PW, (maxY - minY + 90) / PH);
+      tz = Math.max(1.04, Math.min(1.24, 1 / Math.max(0.5, spread)));
+    }
+    const a = 1 - Math.exp(-dt * 2.6);
+    this.camZoom += (tz - this.camZoom) * a;
+    const halfW = PW / this.camZoom / 2;
+    const halfH = PH / this.camZoom / 2;
+    tx = Math.max(halfW, Math.min(PW - halfW, tx));
+    ty = Math.max(halfH, Math.min(PH - halfH, ty));
+    this.camX += (tx - this.camX) * a;
+    this.camY += (ty - this.camY) * a;
   }
 
   private getSkyTopColor(mapId: MapId): string {
@@ -416,8 +478,17 @@ export class CastleRenderer {
     const pctx = this.pctx;
     pctx.imageSmoothingEnabled = false;
 
-    // 1. Blit pre-rendered static 640x360 pixel sky + castle background
+    this.updateCamera(sim, timeSec, attractMode);
+
+    // 1. Far sky layer scrolls slower than the castle (parallax depth), castle stays fixed to the gameplay grid
     const bg = this.ensureStaticBackground(sim.mapId);
+    const parX = Math.round((this.camX - PW / 2) * 0.3);
+    const parY = Math.round((this.camY - PH / 2) * 0.15);
+    if (parX !== 0 || parY !== 0) {
+      pctx.fillStyle = this.getSkyTopColor(sim.mapId);
+      pctx.fillRect(0, 0, PW, PH);
+    }
+    pctx.drawImage(this.skyCache, parX, parY);
     pctx.drawImage(bg, 0, 0);
 
     // 2. Animated pixel scenery (clouds, birds, torches, flags)
@@ -476,12 +547,16 @@ export class CastleRenderer {
     const shakeX = Math.round(shakeMag * (Math.sin(timeSec * 67) * 0.7 + Math.cos(timeSec * 41) * 0.3));
     const shakeY = Math.round(shakeMag * (Math.cos(timeSec * 59) * 0.7 + Math.sin(timeSec * 37) * 0.3));
 
+    const cropW = PW / this.camZoom;
+    const cropH = PH / this.camZoom;
+    const cropX = Math.max(0, Math.min(PW - cropW, this.camX - cropW / 2));
+    const cropY = Math.max(0, Math.min(PH - cropH, this.camY - cropH / 2));
     ctx.drawImage(
       this.pixelBuffer,
-      0,
-      0,
-      PW,
-      PH,
+      cropX,
+      cropY,
+      cropW,
+      cropH,
       offsetX + shakeX,
       offsetY + shakeY,
       drawW,
@@ -586,7 +661,12 @@ export class CastleRenderer {
     }
   }
 
-  private drawPixelStaticCastleLayers(ctx: CanvasRenderingContext2D, mapId: MapId) {
+  private drawPixelStaticCastleLayers(
+    ctx: CanvasRenderingContext2D,
+    mapId: MapId,
+    part: 'far' | 'near' = 'near'
+  ) {
+    if (part === 'far') {
     // Stepped pixel moon / sun orb
     const orbX = mapId === 'towers' ? 512 : 124;
     const orbY = 64;
@@ -613,6 +693,8 @@ export class CastleRenderer {
     ctx.fillRect(274, 170, 2, 8);
     ctx.fillRect(362, 178, 6, 76);
     ctx.fillRect(364, 170, 2, 8);
+      return;
+    }
 
     const wallColor =
       mapId === 'hazard' || mapId === 'story_crimson'
