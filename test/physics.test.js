@@ -115,3 +115,22 @@ test('a match between computer players finishes with one winner', () => {
     assert.ok(r.counts.stomp > 0);
   }
 });
+
+test('adventure: ambushes spawn once, checkpoints move respawn, reaching the gate wins', async () => {
+  const { createGame, stepGame } = await import('../js/game.js');
+  const g = createGame({ mode: 'macera', map: 'giris', countdown: 0, heroes: [{ control: 'human' }] });
+  const h = g.players[0];
+  assert.ok(g.level.width > 1280 && g.level.zones.length > 0);
+  h.x = g.level.zones[0].x + 10;
+  stepGame(g, {}, 1 / 120);
+  const n = g.players.length;
+  assert.equal(n, 1 + g.level.zones[0].foes.length);
+  stepGame(g, {}, 1 / 120);
+  assert.equal(g.players.length, n);
+  h.x = g.level.checkpoints[0] + 10;
+  stepGame(g, {}, 1 / 120);
+  assert.equal(g.ms.cp, g.level.checkpoints[0]);
+  h.x = g.level.flagX + 20;
+  stepGame(g, {}, 1 / 120);
+  assert.equal(g.result?.team, 'A');
+});

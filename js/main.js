@@ -5,7 +5,8 @@ import { KEYMAPS, createKeyboard, readKeys, readGamepad, mergeInputs, emptyInput
 import { DIFFICULTY } from './ai.js';
 import { createGame, stepGame } from './game.js';
 import { MODES, MODE_IDS } from './modes.js';
-import { CHAPTERS, ITEM_LIST, loadSave, storeSave, buy, equip, owns, price, chapterUnlocked, totalStars, reward } from './progress.js';
+import { createCutscene, updateCutscene, advanceCutscene, drawCutscene } from './cutscene.js';
+import { CHAPTERS, won, ITEM_LIST, loadSave, storeSave, buy, equip, owns, price, chapterUnlocked, totalStars, reward } from './progress.js';
 import { hostRoom, joinRoom, snapshot, applySnapshot, createNetInput, normalizeCode, MAX_PLAYERS } from './online.js';
 import * as R from './render.js';
 import { initAudio, sfx, setMuted, isMuted, startMusic } from './audio.js';
@@ -399,6 +400,17 @@ function render() {
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  if (screen === 'cutscene' && cut) {
+    updateCutscene(cut.cs, dt);
+    drawCutscene(ctx, cut.cs, cut.bg);
+    if (cut.cs.done) {
+      const done = cut.done;
+      cut = null;
+      done();
+    }
+    requestAnimationFrame(frame);
+    return;
+  }
   const live = screen === 'playing' || (screen !== 'paused' && run?.demo) || (screen === 'over' && run?.net);
   if (live && g) {
     time += dt;
@@ -707,10 +719,22 @@ function chapterCfg(i) {
   return { ...ch.cfg, heroes: [hero, ...cpus], goalText: `Görev: ${ch.goals.map((t, k) => `${'★'.repeat(k + 1)} ${t}`).join('  ·  ')}` };
 }
 
-function startChapter(i) {
+let cut = null;
+
+function playCut(scene, theme, done) {
+  if (!scene) return done();
+  const bg = R.createBackground(createLevel('avlu', theme));
+  cut = { cs: createCutscene(scene, save.look, myName()), bg, done };
+  screen = 'cutscene';
+  show(null);
+}
+
+function startChapter(i, skipIntro = false) {
   if (!chapterUnlocked(save, i)) return;
   sfx.click();
-  startPlay(chapterCfg(i), { chapter: i });
+  const ch = CHAPTERS[i];
+  const theme = ch.cfg.theme || createLevel(ch.cfg.map).theme;
+  playCut(skipIntro ? null : ch.intro, theme, () => startPlay(chapterCfg(i), { chapter: i }));
 }
 
 /* ---------- Shop ---------- */
@@ -993,11 +1017,16 @@ function resume() {
 }
 
 function restart() {
-  if (run.chapter >= 0) startChapter(run.chapter);
+  if (run.chapter >= 0) startChapter(run.chapter, true);
   else startPlay(run.cfg);
 }
 
 function showOver() {
+  const ch = CHAPTERS[run.chapter];
+  if (ch?.outro && !run.net && !run.outroDone && won(g)) {
+    run.outroDone = true;
+    return playCut(ch.outro, g.level.theme, showOver);
+  }
   screen = 'over';
   const res = g.result || {};
   const you = run.net === 'client' ? g.players.find((p) => p.id === g.youId) : g.players.find((p) => p.info.control === 'human');
@@ -1059,6 +1088,12 @@ $('#mute').addEventListener('click', toggleMute);
 
 window.addEventListener('keydown', (e) => {
   if (e.target.closest?.('input')) return;
+  if (screen === 'cutscene' && cut) {
+    if (e.code === 'Escape') cut.cs.done = true;
+    else if (['Space', 'Enter', 'NumpadEnter', 'KeyW', 'ArrowUp', 'KeyJ'].includes(e.code)) advanceCutscene(cut.cs);
+    e.preventDefault();
+    return;
+  }
   if (e.code === 'Escape' || e.code === 'KeyP') {
     if (screen === 'playing') pause();
     else if (screen === 'paused') resume();
@@ -1071,6 +1106,9 @@ window.addEventListener('keydown', (e) => {
   }
 });
 window.addEventListener('blur', pause);
+window.addEventListener('pointerdown', (e) => {
+  if (screen === 'cutscene' && cut && !e.target.closest?.('button')) advanceCutscene(cut.cs);
+});
 window.addEventListener('pointerdown', () => initAudio(), { once: true });
 
 window.__kale = {
