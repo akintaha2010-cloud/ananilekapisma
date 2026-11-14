@@ -153,10 +153,12 @@ export function createBackground(level) {
   if (th.dungeon) dungeonBack(ctx, rnd, th);
   else skyline(ctx, rnd, th);
 
-  bricks(ctx, L + 40, 265, R - L - 80, 380, th.wall, rnd);
-  merlons(ctx, L + 40, 265, R - L - 80, th.wall);
-  ctx.fillStyle = `rgba(10,6,25,${th.shade})`;
-  ctx.fillRect(L + 40, 265, R - L - 80, 380);
+  if (R - L > 80) {
+    bricks(ctx, L + 40, 265, R - L - 80, 380, th.wall, rnd);
+    merlons(ctx, L + 40, 265, R - L - 80, th.wall);
+    ctx.fillStyle = `rgba(10,6,25,${th.shade})`;
+    ctx.fillRect(L + 40, 265, R - L - 80, 380);
+  }
 
   for (const wx of level.windows) {
     ctx.fillStyle = '#1d1430';
@@ -920,4 +922,83 @@ export function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+const OUT = '#1b1030';
+const shadeHex = (hex, k) => {
+  const n = parseInt(hex.slice(1), 16);
+  const f = (v) => Math.max(0, Math.min(255, Math.round(v * k)));
+  return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+};
+
+/** Kayan bölümlerde katman katman tepeler, ağaçlar ve uzak kale duvarı (kalın çizgili çizgi film tarzı). */
+export function drawParallax(ctx, level, cam) {
+  const th = THEMES[level.theme] || THEMES.gece;
+  const night = th.stars > 20;
+  const hill1 = th.dungeon ? '#3a2f4a' : th.snow ? '#cfdcef' : night ? '#3b3f6e' : '#7bb36a';
+  const hill2 = th.dungeon ? '#2c2238' : th.snow ? '#a9bedb' : night ? '#2a2f55' : '#5a9a52';
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = OUT;
+  ctx.lineJoin = 'round';
+  const layer = (speed, base, amp, col, seed, trees) => {
+    const off = cam * speed;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(-10, H);
+    for (let x = -10; x <= W + 10; x += 20) {
+      const wx = x + off;
+      ctx.lineTo(x, base - amp * (0.55 * Math.sin(wx / 230 + seed) + 0.45 * Math.sin(wx / 97 + seed * 2)));
+    }
+    ctx.lineTo(W + 10, H);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    if (!trees) return;
+    const step = 170;
+    for (let k = Math.floor(off / step) - 1; k < (off + W) / step + 1; k++) {
+      const r = Math.abs(Math.sin(k * 12.9898 + seed) * 43758.5453) % 1;
+      if (r < 0.35) continue;
+      const wx = k * step + r * 90;
+      const x = wx - off;
+      const y = base - amp * (0.55 * Math.sin(wx / 230 + seed) + 0.45 * Math.sin(wx / 97 + seed * 2)) + 4;
+      const h = 60 + r * 50;
+      ctx.fillStyle = '#5b3a24';
+      ctx.fillRect(x - 6, y - h * 0.45, 12, h * 0.45);
+      ctx.strokeRect(x - 6, y - h * 0.45, 12, h * 0.45);
+      ctx.fillStyle = th.snow ? '#eef4fb' : th.dungeon ? '#4a3d5e' : shadeHex(night ? '#3e6a5a' : '#3f8f4a', 0.8 + r * 0.4);
+      const blobs = [[0, 0.62, 0.32], [-0.2, 0.45, 0.24], [0.2, 0.45, 0.24]];
+      ctx.lineWidth = 10;
+      for (const pass of ['stroke', 'fill'])
+        for (const [bx, by, br] of blobs) {
+          ctx.beginPath();
+          ctx.arc(x + bx * h, y - h * by, h * br, 0, Math.PI * 2);
+          ctx[pass]();
+        }
+      ctx.lineWidth = 5;
+    }
+  };
+  layer(0.12, 430, 50, hill2, 1.3, false);
+  const off = cam * 0.3;
+  ctx.fillStyle = shadeHex(th.wall || '#5a5470', 0.75);
+  for (let k = Math.floor(off / 520) - 1; k < (off + W) / 520 + 1; k++) {
+    const x = k * 520 - off + 140;
+    ctx.fillRect(x, 330, 90, 160);
+    ctx.strokeRect(x, 330, 90, 160);
+    for (let m = 0; m < 3; m++) {
+      ctx.fillRect(x + m * 33, 314, 24, 18);
+      ctx.strokeRect(x + m * 33, 314, 24, 18);
+    }
+    ctx.fillStyle = '#c8102e';
+    ctx.beginPath();
+    ctx.moveTo(x + 45, 314);
+    ctx.lineTo(x + 45, 270);
+    ctx.lineTo(x + 80, 282);
+    ctx.lineTo(x + 45, 294);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = shadeHex(th.wall || '#5a5470', 0.75);
+  }
+  layer(0.45, 520, 40, hill1, 4.1, true);
+  ctx.fillStyle = 'rgba(10,6,25,0.18)';
+  ctx.fillRect(0, 0, W, H);
 }

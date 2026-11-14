@@ -96,7 +96,7 @@ function begin(cfg, opts = {}) {
   const lv = g.level;
   g.cam = 0;
   if (lv.adventure) {
-    g.bg = R.createBackground({ ...lv, moatL: -40, moatR: WORLD.w + 40, platforms: [], windows: [200, 640, 1080], banners: [90, 420, 860, 1190] });
+    g.bg = R.createBackground({ ...lv, moatL: 0, moatR: 0, platforms: [], windows: [], banners: [] });
     g.solids = R.createSolids(lv);
   } else g.bg = R.createBackground(lv);
   g.players.forEach(dress);
@@ -352,9 +352,8 @@ function render() {
   if (run.shake > 0) ctx.translate((Math.random() - 0.5) * run.shake, (Math.random() - 0.5) * run.shake);
   const cam = g.cam || 0;
   if (g.solids) {
-    const off = (cam * 0.35) % WORLD.w;
-    ctx.drawImage(g.bg, -off, 0, WORLD.w, WORLD.h);
-    ctx.drawImage(g.bg, WORLD.w - off, 0, WORLD.w, WORLD.h);
+    ctx.drawImage(g.bg, 0, 0, WORLD.w, WORLD.h);
+    R.drawParallax(ctx, g.level, cam);
     ctx.save();
     ctx.translate(-cam, 0);
     ctx.drawImage(g.solids, 0, 0);
