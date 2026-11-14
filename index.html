@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Kale Kapışması</title>
+    <meta name="description" content="Fesli, bıyıklı kahramanların kalede birbirini ezmeye çalıştığı 1-4 kişilik tarayıcı oyunu." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏰</text></svg>" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="stage">
+      <canvas id="game" width="1280" height="720" aria-label="Kale Kapışması oyun alanı"></canvas>
+
+      <section id="menu" class="overlay">
+        <div class="panel">
+          <h1>Kale <span>Kapışması</span></h1>
+          <p class="tagline">Rakibinin kafasına zıpla, ez, hendeğe it! Son ayakta kalan kazanır.</p>
+          <div id="slots"></div>
+          <div class="row options">
+            <label>Can:
+              <span class="seg" id="lives">
+                <button data-v="3">3</button><button data-v="5">5</button><button data-v="7">7</button>
+              </span>
+            </label>
+            <button id="start" class="big">Kapışmaya Başla!</button>
+          </div>
+          <details class="help">
+            <summary>Nasıl oynanır?</summary>
+            <ul>
+              <li><b>Ez:</b> Rakibin kafasına üstten düş, bir canı gider. Zıplama tuşunu basılı tutarsan daha yükseğe sekersin.</li>
+              <li><b>Çift zıplama:</b> Havadayken bir kez daha zıplayabilirsin.</li>
+              <li><b>Çakıl:</b> Havada aşağı tuşu ile yere çakıl; yere inince etraftakileri savurursun. Tahta platformlarda aşağı tuşu ile aşağı inersin.</li>
+              <li><b>İt:</b> İtme tuşu ile hamle yap, rakibi kuleden hendeğe uçur. Suya düşen bir can kaybeder.</li>
+              <li>Gamepad bağlıysa: sol çubuk yürü, A zıpla, B çakıl, X/RB it.</li>
+            </ul>
+          </details>
+        </div>
+      </section>
+
+      <section id="pause" class="overlay hidden">
+        <div class="panel small">
+          <h2>Mola</h2>
+          <button id="resume" class="big">Devam</button>
+          <button id="restart">Yeniden başlat</button>
+          <button id="toMenu">Menü</button>
+        </div>
+      </section>
+
+      <section id="over" class="overlay hidden">
+        <div class="panel small">
+          <h2 id="winner">Kazanan</h2>
+          <table id="stats"></table>
+          <button id="again" class="big">Tekrar Oyna</button>
+          <button id="overMenu">Menü</button>
+        </div>
+      </section>
+
+      <div id="touch" class="hidden">
+        <div class="pad left">
+          <button data-act="left">◀</button>
+          <button data-act="right">▶</button>
+        </div>
+        <div class="pad right">
+          <button data-act="shove">İT</button>
+          <button data-act="down">▼</button>
+          <button data-act="jump" class="jump">▲</button>
+        </div>
+      </div>
+
+      <div id="corner">
+        <button id="mute" title="Ses (M)">Ses: Açık</button>
+        <button id="pauseBtn" title="Mola (Esc)">II</button>
+      </div>
+    </div>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

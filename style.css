@@ -1,0 +1,129 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #0d0a1c;
+  color: #fff;
+  font-family: 'Trebuchet MS', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+#stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1280px;
+  height: 720px;
+  transform-origin: 0 0;
+}
+#game {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 10px;
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 8, 30, 0.45);
+  backdrop-filter: blur(2px);
+}
+.hidden { display: none !important; }
+.panel {
+  background: rgba(28, 18, 52, 0.92);
+  border: 3px solid #f0a25e;
+  border-radius: 22px;
+  padding: 22px 30px;
+  width: 1040px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+.panel.small { width: 460px; display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+h1 {
+  margin: 0;
+  font-size: 58px;
+  letter-spacing: 1px;
+  color: #ffd27a;
+  text-shadow: 0 4px 0 #8b3a16, 0 8px 18px rgba(0, 0, 0, 0.5);
+}
+h1 span { color: #ff6b5b; }
+h2 { margin: 0 0 6px; font-size: 40px; color: #ffd27a; text-shadow: 0 3px 0 #8b3a16; }
+.tagline { margin: 6px 0 16px; font-size: 18px; color: #e8dcff; }
+#slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.slot {
+  background: rgba(255, 255, 255, 0.06);
+  border: 3px solid var(--c, #666);
+  border-radius: 16px;
+  padding: 10px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 300px;
+}
+.slot.off { opacity: 0.55; border-style: dashed; }
+.slot h3 { margin: 0; font-size: 18px; }
+.slot canvas { width: 150px; height: 130px; }
+.slot .colorpick { display: flex; align-items: center; gap: 6px; }
+.slot .colorpick span { min-width: 70px; font-weight: 700; }
+.slot .keys { font-size: 12.5px; color: #cfc3ea; min-height: 34px; line-height: 1.35; }
+button {
+  font: inherit;
+  font-weight: 800;
+  color: #fff;
+  background: #4b347a;
+  border: 2px solid #7f63b8;
+  border-radius: 12px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: transform 0.08s, background 0.15s;
+}
+button:hover { background: #5c4193; }
+button:active { transform: scale(0.96); }
+button.big {
+  font-size: 24px;
+  padding: 12px 26px;
+  background: linear-gradient(#ff7a4d, #d9452b);
+  border-color: #ffb08a;
+  box-shadow: 0 5px 0 #7d2412;
+}
+button.big:hover { background: linear-gradient(#ff8c63, #e2543a); }
+.slot .type { width: 100%; }
+.slot .type.cpu { background: #2f5b7a; border-color: #5a93bd; }
+.slot .type.human { background: #3f7a3a; border-color: #6cbf63; }
+.arrow { padding: 4px 10px; }
+.row { display: flex; align-items: center; justify-content: center; gap: 30px; margin-top: 18px; }
+.options label { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.seg { display: inline-flex; border-radius: 12px; overflow: hidden; border: 2px solid #7f63b8; }
+.seg button { border: 0; border-radius: 0; padding: 8px 16px; background: #2d2050; }
+.seg button.on { background: #f0a25e; color: #2a1408; }
+.help { margin-top: 14px; text-align: left; color: #e8dcff; font-size: 15px; }
+.help summary { cursor: pointer; font-weight: 800; text-align: center; }
+.help ul { margin: 8px 0 0; padding-left: 22px; line-height: 1.5; }
+#stats { width: 100%; border-collapse: collapse; font-size: 17px; margin-bottom: 6px; }
+#stats th, #stats td { padding: 5px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+#stats td:first-child { text-align: left; font-weight: 800; }
+#stats .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+#corner { position: absolute; right: 14px; bottom: 12px; display: flex; gap: 8px; }
+#corner button { padding: 5px 10px; font-size: 14px; background: rgba(40, 26, 70, 0.75); }
+#touch { position: absolute; inset: auto 0 0 0; height: 200px; pointer-events: none; }
+#touch .pad { position: absolute; bottom: 24px; display: flex; gap: 18px; pointer-events: auto; }
+#touch .pad.left { left: 30px; }
+#touch .pad.right { right: 30px; align-items: flex-end; }
+#touch button {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  font-size: 34px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  touch-action: none;
+}
+#touch button.jump { width: 140px; height: 140px; }
+#touch button.on { background: rgba(255, 210, 122, 0.5); }
