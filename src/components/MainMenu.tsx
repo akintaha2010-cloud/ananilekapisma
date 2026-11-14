@@ -211,182 +211,93 @@ export const MainMenu: React.FC<MainMenuProps> = ({
     <div className="fixed inset-0 z-20 flex flex-col justify-between p-4 md:p-6 pointer-events-none">
       <div className="flex-1 flex items-center justify-center pointer-events-auto">
         {subView === 'home' && (
-          <div className="w-full max-w-2xl mx-auto bg-slate-950/94 border-2 border-amber-500/80 rounded-none p-5 md:p-6 pixel-panel flex flex-col">
-            {/* Top Progression & Player Profile Strip */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b-2 border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="bg-slate-900 border-2 border-amber-400/70 p-1">
-                  <CharacterPreviewSvg
-                    costume={slots[0]?.costume}
-                    heroId={slots[0]?.heroId}
-                    size={54}
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      data-testid="player-level-badge"
-                      className="px-2 py-0.5 bg-amber-500 text-slate-950 font-display text-xs font-bold"
-                    >
-                      SV. {xpInfo.level}
-                    </span>
-                    <span className="font-display text-sm font-bold text-white">
-                      {slots[0]?.name || 'Pofi'}
-                    </span>
-                    <span className="text-[11px] text-cyan-300 font-semibold">
-                      ({p1Hero.name})
-                    </span>
-                  </div>
-
-                  {/* XP Bar */}
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <div className="w-36 sm:w-44 h-2 bg-slate-900 border border-slate-700">
-                      <div
-                        className="h-full bg-emerald-400 transition-all"
-                        style={{ width: `${xpPct}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-mono-num text-slate-300">
-                      {xpInfo.currentLevelXp}/{xpInfo.nextLevelXp} XP
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="px-2.5 py-1.5 bg-slate-900 border-2 border-slate-700 text-xs font-display font-bold text-amber-300 inline-flex items-center gap-1.5">
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  {totalStars}/{SAGA_LEVELS.length * 3}
-                </div>
-                <button
-                  type="button"
-                  data-testid="menu-quit-btn"
-                  onClick={handleRequestQuit}
-                  className="px-3 py-1.5 bg-rose-950/90 hover:bg-rose-900 border-2 border-rose-500 text-rose-100 font-display text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer pixel-btn"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  Çıkış
-                </button>
-              </div>
-            </div>
-
-            {/* Title */}
-            <div className="flex flex-col items-center text-center mt-4 select-none">
+          <div className="kk-home w-full h-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr] items-center gap-4 md:gap-8">
+            <div className="flex flex-col items-center md:items-start gap-5 md:gap-7">
               <button
                 type="button"
                 onClick={handleTitleClick}
                 data-testid="menu-title"
-                className="cursor-pointer bg-transparent border-0"
+                className="kk-title-btn"
                 aria-label="Kale Kapmaca"
               >
-                <h1 className="font-display text-5xl md:text-6xl font-bold tracking-wide text-amber-300 dtm-title">
-                  KALE KAPMACA
-                </h1>
+                <span className="kk-title">KALE</span>
+                <span className="kk-title kk-title-2">KAPMACA</span>
               </button>
-              <div className="mt-2 font-display text-[11px] font-bold tracking-[0.3em] text-rose-300">
-                HAVEN ANKARA BASKISI
-              </div>
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-semibold">
-                <span className="px-2 py-0.5 bg-slate-900 border border-slate-700 text-amber-200">{activeMode.title}</span>
-                <span className="px-2 py-0.5 bg-slate-900 border border-slate-700 text-cyan-200">{activeMap.title}</span>
-                <span className="px-2 py-0.5 bg-slate-900 border border-slate-700 text-emerald-200">
-                  {activeHumans} Oyuncu / {activeBots} Bot
-                </span>
-              </div>
-            </div>
 
-            {/* Main actions */}
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-[1.35fr_1fr] gap-3">
-              <div className="flex flex-col gap-2.5">
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
                 <button
                   type="button"
                   onClick={onStartGame}
                   data-start="true"
-                  className="py-4 px-5 justify-center bg-amber-500 hover:bg-amber-400 border-amber-200 text-slate-950 text-xl tracking-wide rounded-none font-display font-bold flex items-center gap-2.5 cursor-pointer dtm-btn"
+                  className="kk-btn kk-btn-xl bg-[#ffb627]"
+                  aria-label="Oyna"
                 >
-                  <Play className="w-6 h-6 fill-current" />
-                  HIZLI OYNA
+                  <Play className="kk-ico fill-current" />
                 </button>
                 <button
                   type="button"
                   onClick={() => onSetSubView('adventure')}
                   data-testid="menu-adventure-btn"
-                  className="py-3 px-4 bg-rose-700 hover:bg-rose-600 border-rose-200 text-white text-sm rounded-none font-display font-bold flex items-center gap-2.5 cursor-pointer dtm-btn"
+                  className="kk-btn kk-btn-xl bg-[#e2444f]"
+                  aria-label="Macera"
                 >
-                  <Swords className="w-5 h-5 shrink-0" />
-                  <span className="flex-1 text-left">MACERA: KARA PAŞA</span>
-                  <span className="text-xs bg-black/30 px-1.5 py-0.5">{adventureProgress.completed.length}/{ADVENTURE_CHAPTERS.length}</span>
+                  <Swords className="kk-ico" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => onSetSubView('saga')}
-                  data-testid="menu-saga-btn"
-                  className="py-3 px-4 bg-pink-600 hover:bg-pink-500 border-pink-200 text-white text-sm rounded-none font-display font-bold flex items-center gap-2.5 cursor-pointer dtm-btn"
+                  onClick={() => onSetSubView('characters')}
+                  data-testid="menu-characters-btn"
+                  className="kk-btn kk-btn-xl bg-[#8e44c9]"
+                  aria-label="Kahramanlar"
                 >
-                  <MapIcon className="w-5 h-5 shrink-0" />
-                  <span className="flex-1 text-left">SEVİYE HARİTASI</span>
-                  <span className="text-xs bg-black/30 px-1.5 py-0.5">{sagaProgress.highestUnlockedLevel}/15</span>
+                  <Users className="kk-ico" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => onSetSubView('story')}
-                  data-testid="menu-story-btn"
-                  className="py-3 px-4 bg-teal-700 hover:bg-teal-600 border-teal-200 text-white text-sm rounded-none font-display font-bold flex items-center gap-2.5 cursor-pointer dtm-btn"
+                  onClick={() => onSetSubView('online')}
+                  data-testid="menu-online-btn"
+                  className="kk-btn kk-btn-xl bg-[#2b8fd6]"
+                  aria-label="Çevrimiçi"
                 >
-                  <Compass className="w-5 h-5 shrink-0" />
-                  <span className="flex-1 text-left">HİKÂYE</span>
-                  <span className="text-xs bg-black/30 px-1.5 py-0.5">{storyProgress.completedChapters.length}/7</span>
+                  <Globe className="kk-ico" />
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-1 gap-2 content-start">
+              <div className="flex flex-wrap justify-center md:justify-start gap-2.5">
                 {[
-                  { view: 'online' as const, id: 'menu-online-btn', label: 'ÇEVRİMİÇİ', icon: Globe, color: 'text-sky-300' },
-                  { view: 'characters' as const, id: 'menu-characters-btn', label: 'KAHRAMANLAR', icon: Users, color: 'text-amber-300' },
-                  { view: 'modes' as const, id: 'menu-modes-btn', label: 'MODLAR & HARİTA', icon: Sparkles, color: 'text-fuchsia-300' },
-                  {
-                    view: 'achievements' as const,
-                    id: 'menu-achievements-btn',
-                    label: `BAŞARIMLAR ${achievementState.unlockedIds.length}/${ACHIEVEMENTS.length}`,
-                    icon: Trophy,
-                    color: 'text-yellow-300',
-                  },
-                  { view: 'settings' as const, id: 'menu-settings-btn', label: 'AYARLAR', icon: Settings, color: 'text-slate-300' },
-                  { view: 'howto' as const, id: 'menu-howto-btn', label: 'NASIL OYNANIR', icon: HelpCircle, color: 'text-emerald-300' },
+                  { view: 'saga' as const, id: 'menu-saga-btn', label: 'Seviye Haritası', icon: MapIcon, bg: 'bg-[#ff6fa8]' },
+                  { view: 'story' as const, id: 'menu-story-btn', label: 'Hikâye', icon: Compass, bg: 'bg-[#1fa59a]' },
+                  { view: 'modes' as const, id: 'menu-modes-btn', label: 'Mod ve Harita', icon: Sparkles, bg: 'bg-[#f0883e]' },
+                  { view: 'achievements' as const, id: 'menu-achievements-btn', label: 'Başarımlar', icon: Trophy, bg: 'bg-[#3d4a5c]' },
+                  { view: 'settings' as const, id: 'menu-settings-btn', label: 'Ayarlar', icon: Settings, bg: 'bg-[#3d4a5c]' },
+                  { view: 'howto' as const, id: 'menu-howto-btn', label: 'Nasıl Oynanır', icon: HelpCircle, bg: 'bg-[#3d4a5c]' },
                 ].map((b) => (
                   <button
                     key={b.view}
                     type="button"
                     onClick={() => onSetSubView(b.view)}
                     data-testid={b.id}
-                    className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 border-slate-500 text-slate-100 text-xs rounded-none font-display font-bold flex items-center gap-2.5 cursor-pointer dtm-btn"
+                    className={`kk-btn kk-btn-sm ${b.bg}`}
+                    aria-label={b.label}
+                    title={b.label}
                   >
-                    <b.icon className={`w-4 h-4 shrink-0 ${b.color}`} />
-                    {b.label}
+                    <b.icon className="w-6 h-6" />
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Funny tip ticker */}
-            <div className="mt-4 bg-slate-900 border-2 border-slate-700 px-3 py-2 flex items-center gap-2.5 min-h-[40px]">
-              <OrpheusSvg size={24} className="shrink-0" />
-              <span key={tipIdx} className="text-xs text-slate-200 tip-in" data-testid="menu-tip">
-                {pickQuip(MENU_TIPS, tipIdx)}
-              </span>
-            </div>
-
-            {/* Footer */}
-            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-              <a
-                href="./klasik/"
-                className="py-1.5 px-3 bg-indigo-950/80 hover:bg-indigo-900 border-2 border-indigo-500 text-indigo-100 font-display font-bold pixel-btn"
+            <div className="hidden sm:flex flex-col items-center justify-center">
+              <button
+                type="button"
+                onClick={() => onSetSubView('characters')}
+                className="kk-hero-card"
+                aria-label="Kahraman seç"
               >
-                KLASİK KALE KAPIŞMASI
-              </a>
-              <span className="font-display font-bold text-[#FF8C9E]" data-testid="menu-secret-count">
-                Gizli sırlar: {foundSecrets.length}/{SECRETS.length}
-              </span>
+                <CharacterPreviewSvg costume={slots[0]?.costume} heroId={slots[0]?.heroId} size={210} />
+                <span data-testid="player-level-badge" className="kk-level">{xpInfo.level}</span>
+              </button>
+              <div className="kk-name">{slots[0]?.name || p1Hero.name}</div>
             </div>
           </div>
         )}
@@ -546,12 +457,6 @@ export const MainMenu: React.FC<MainMenuProps> = ({
         </div>
       )}
 
-      {/* Bottom control hint */}
-      {subView === 'home' && (
-        <div className="text-center font-display text-xs md:text-sm font-medium text-amber-100/90 hud-stroke pointer-events-none">
-          Hareket: A/D · Zıpla: W · Hızlı İn: S · Özel Güç: E · Duraklat: Esc/P
-        </div>
-      )}
     </div>
   );
 };

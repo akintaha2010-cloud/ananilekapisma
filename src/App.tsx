@@ -80,7 +80,7 @@ import {
   StoryProgress,
 } from './game/types';
 
-const MATCH_COUNTDOWN_SEC = 3.6;
+const MATCH_COUNTDOWN_SEC = 3;
 const STORAGE_KEY = 'kale_kapmaca_prefs_v1';
 
 function loadSavedState(): { settings: GameSettings; slots: PlayerSlotConfig[] } {
