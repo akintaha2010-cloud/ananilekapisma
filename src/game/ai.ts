@@ -233,13 +233,24 @@ export function computeBotInput(
     return input;
   }
 
+  if (sim.mode === 'crown' && sim.crownHolder == null && sim.crownX !== undefined) {
+    if (cx < sim.crownX - 12) input.right = true;
+    else if (cx > sim.crownX + 12) input.left = true;
+    if (sim.crownY !== undefined && sim.crownY < bot.y - 10 && Math.abs(cx - sim.crownX) < 160) {
+      input.jumpPressed = bot.grounded;
+      input.upHeld = true;
+    }
+    return input;
+  }
+
   let target = enemies[0];
   let bestScore = Infinity;
   for (const enemy of enemies) {
     const dist = Math.hypot(enemy.x - bot.x, enemy.y - bot.y);
     // Slightly prioritize stunned or edge-exposed targets
     const vulnerableBonus = enemy.stunTimer > 0 ? -90 : 0;
-    const score = dist + vulnerableBonus;
+    const crownBonus = sim.mode === 'crown' && enemy.slotIndex === sim.crownHolder ? -400 : 0;
+    const score = dist + vulnerableBonus + crownBonus;
     if (score < bestScore) {
       bestScore = score;
       target = enemy;

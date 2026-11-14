@@ -11,7 +11,7 @@ export type MenuSubView =
   | 'saga'
   | 'achievements';
 
-export type GameModeId = 'ffa' | 'team' | 'time' | 'chaos' | 'story' | 'saga';
+export type GameModeId = 'ffa' | 'team' | 'time' | 'chaos' | 'crown' | 'story' | 'saga';
 
 export type MapId =
   | 'classic'
@@ -297,6 +297,10 @@ export interface SimulationState {
   winReason: string;
   pendingEvents: GameEvent[];
   storyRule?: StoryMatchRule | null;
+  crownHolder?: number | null;
+  crownX?: number;
+  crownY?: number;
+  crownHeld?: Record<number, number>;
 }
 
 export interface HudPlayerSummary {

@@ -4,6 +4,7 @@ import {
   ARENA_WIDTH,
   CHARACTER_COLORS,
   PHYSICS,
+  CROWN_WIN_SEC,
 } from './constants';
 import { createInitialPlatforms, getMapLayout } from './maps';
 import {
@@ -114,7 +115,7 @@ export function createSimulation(
     mapId: settings.mapId,
     elapsedSec: 0,
     timeRemainingSec:
-      settings.mode === 'time'
+      settings.mode === 'time' || settings.mode === 'crown'
         ? settings.roundDurationSec
         : storyRule?.surviveSeconds ?? 0,
     hitstopTimer: 0,
@@ -883,6 +884,9 @@ function applyHeadStomp(
 
   sim.hitstopTimer = 0.055;
   sim.trauma = Math.min(1, sim.trauma + 0.48);
+  if (sim.mode === 'crown' && sim.crownHolder === victim.slotIndex) {
+    sim.crownHolder = attacker.slotIndex;
+  }
 
   sim.pendingEvents.push({
     type: 'stomp',
@@ -1015,6 +1019,21 @@ function evaluateWinCondition(sim: SimulationState) {
           ? 'Mavi Takım kaleyi fethetti!'
           : 'Takımlar aynı anda düştü!';
     }
+  } else if (sim.mode === 'crown') {
+    const held = sim.crownHeld ?? {};
+    const champ = sim.players.find((p) => (held[p.slotIndex] ?? 0) >= CROWN_WIN_SEC);
+    if (champ || sim.timeRemainingSec <= 0) {
+      sim.timeRemainingSec = Math.max(0, sim.timeRemainingSec);
+      sim.finished = true;
+      const winner =
+        champ ??
+        [...sim.players].sort((a, b) => (held[b.slotIndex] ?? 0) - (held[a.slotIndex] ?? 0))[0] ??
+        null;
+      sim.winnerSlot = winner ? winner.slotIndex : null;
+      sim.winReason = winner
+        ? `${winner.name} tacı ${Math.floor(held[winner.slotIndex] ?? 0)} saniye taşıyarak kalenin padişahı oldu!`
+        : 'Taç sahipsiz kaldı!';
+    }
   } else if (sim.mode === 'time') {
     if (sim.timeRemainingSec <= 0) {
       sim.timeRemainingSec = 0;
@@ -1059,6 +1078,7 @@ export function stepSimulation(
   sim.elapsedSec += dt;
   if (
     sim.mode === 'time' ||
+    sim.mode === 'crown' ||
     ((sim.mode === 'story' || sim.mode === 'saga') && sim.storyRule?.surviveSeconds)
   ) {
     sim.timeRemainingSec = Math.max(0, sim.timeRemainingSec - dt);
@@ -1080,7 +1100,52 @@ export function stepSimulation(
   }
 
   resolveCharacterCollisions(sim);
+  if (sim.mode === 'crown') updateCrown(sim, dt);
   evaluateWinCondition(sim);
+}
+
+function resetCrown(sim: SimulationState) {
+  const base = sim.platforms.reduce((a, b) => (b.w > a.w ? b : a), sim.platforms[0]);
+  sim.crownHolder = null;
+  sim.crownX = base ? base.x + base.w / 2 : ARENA_WIDTH / 2;
+  sim.crownY = base ? base.y - 70 : ARENA_HEIGHT / 2;
+}
+
+function updateCrown(sim: SimulationState, dt: number) {
+  sim.crownHeld ??= {};
+  if (sim.crownX === undefined) resetCrown(sim);
+  let holder = sim.players.find((p) => p.slotIndex === sim.crownHolder);
+  if (holder && (!holder.alive || holder.eliminated)) {
+    resetCrown(sim);
+    holder = undefined;
+  }
+  if (!holder) {
+    const cx = sim.crownX ?? 0;
+    const cy = sim.crownY ?? 0;
+    holder = sim.players.find(
+      (p) =>
+        p.alive &&
+        !p.eliminated &&
+        p.respawnTimer <= 0 &&
+        cx > p.x - 26 && cx < p.x + p.w + 26 &&
+        cy > p.y - 40 && cy < p.y + p.h + 26
+    );
+    if (!holder) return;
+    sim.crownHolder = holder.slotIndex;
+    sim.pendingEvents.push({
+      type: 'stomp',
+      x: cx,
+      y: cy,
+      slotIndex: holder.slotIndex,
+      color: '#FACC15',
+    });
+  }
+  const before = sim.crownHeld[holder.slotIndex] ?? 0;
+  const after = before + dt;
+  sim.crownHeld[holder.slotIndex] = after;
+  holder.score += 5 * (Math.floor(after) - Math.floor(before));
+  sim.crownX = holder.x + holder.w / 2;
+  sim.crownY = holder.y - 14;
 }
 
 export function buildHudSnapshot(sim: SimulationState): HudSnapshot {

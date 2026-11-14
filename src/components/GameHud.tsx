@@ -63,7 +63,7 @@ export const GameHud: React.FC<GameHudProps> = ({
   onTouchAbility,
 }) => {
   const hazardText = HAZARD_LABELS[hud.hazardPhase];
-  const isTimed = hud.mode === 'time';
+  const isTimed = hud.mode === 'time' || hud.mode === 'crown';
   const isChaos = hud.mode === 'chaos';
   const showLivesBar =
     hud.mode === 'ffa' ||

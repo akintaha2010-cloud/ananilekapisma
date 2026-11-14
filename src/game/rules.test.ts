@@ -375,3 +375,30 @@ test('XP level progression and Saga 1-3 star computation work deterministically'
 });
 
 
+
+test('crown mode: touching crown grabs it, stomping holder steals it, bots finish match', () => {
+  const settings: GameSettings = { ...DEFAULT_SETTINGS, mapId: 'classic', mode: 'crown', roundDurationSec: 90 };
+  const slots: PlayerSlotConfig[] = DEFAULT_SLOTS.map((s) => ({ ...s, kind: 'bot', aiPersonality: 'aggressive' }));
+  const sim = createSimulation(settings, slots);
+  assert.equal(sim.timeRemainingSec, 90);
+  stepSimulation(sim, {}, 1 / 60);
+  assert.notEqual(sim.crownX, undefined);
+  const p0 = sim.players[0];
+  p0.x = (sim.crownX ?? 0) - p0.w / 2;
+  p0.y = (sim.crownY ?? 0) - p0.h / 2;
+  stepSimulation(sim, {}, 1 / 60);
+  assert.equal(sim.crownHolder, p0.slotIndex);
+
+  let steps = 0;
+  while (!sim.finished && steps < 60 * 120) {
+    const inputs: Record<number, PlayerInputState> = {};
+    for (const p of sim.players) inputs[p.slotIndex] = computeBotInput(p, sim, 1 / 60);
+    stepSimulation(sim, inputs, 1 / 60);
+    steps++;
+  }
+  assert.equal(sim.finished, true);
+  assert.notEqual(sim.winnerSlot, null);
+  const held = Object.values(sim.crownHeld ?? {}).reduce((a, b) => a + b, 0);
+  assert.ok(held > 5, `crown should be carried for a while, got ${held}`);
+  buildRoundResult(sim);
+});

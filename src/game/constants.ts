@@ -213,7 +213,17 @@ export const GAME_MODES: GameModeMeta[] = [
       'Sınırsız eğlence! Kimse kalıcı olarak elenmez, her kafa ezme (+10) ve düşürme (+25) anlık puan tablosuna yazılır.',
     badgeText: 'Parti Modu',
   },
+  {
+    id: 'crown',
+    title: 'Taç Kapışı',
+    subtitle: `Tacı ${30} Saniye Tutan Kazanır`,
+    description:
+      'Avlunun ortasındaki altın tacı kap! Taşıyanın kafasına zıplayan tacı çalar. Toplam 30 saniye tutan ya da süre bittiğinde en uzun tutan kazanır.',
+    badgeText: 'Klasik Kapışma',
+  },
 ];
+
+export const CROWN_WIN_SEC = 30;
 
 export interface MapMeta {
   id: MapId;

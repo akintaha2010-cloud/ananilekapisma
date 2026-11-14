@@ -441,6 +441,10 @@ export class CastleRenderer {
       if (!player.alive || player.eliminated) continue;
       this.drawPixelCharacter(pctx, player, timeSec, attractMode);
     }
+    if (sim.mode === 'crown' && sim.crownX !== undefined && sim.crownY !== undefined) {
+      const bob = sim.crownHolder == null ? Math.round(Math.sin(timeSec * 3) * 4) : 0;
+      this.drawPixelCrown(pctx, sim.crownX, sim.crownY + bob, timeSec);
+    }
 
     // 7. Pooled pixel particles + floating score popups
     this.drawPixelParticles(pctx);
@@ -482,6 +486,34 @@ export class CastleRenderer {
       drawH
     );
 
+    ctx.restore();
+  }
+
+  private drawPixelCrown(ctx: CanvasRenderingContext2D, x: number, y: number, timeSec: number) {
+    const px = Math.round(x * PSCALE) - 8;
+    const py = Math.round(y * PSCALE) - 10;
+    ctx.save();
+    ctx.globalAlpha = 0.25 + 0.12 * Math.sin(timeSec * 5);
+    ctx.fillStyle = '#FDE68A';
+    ctx.fillRect(px - 4, py - 4, 24, 18);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#3B2106';
+    ctx.fillRect(px - 1, py + 3, 18, 8);
+    ctx.fillRect(px - 1, py - 1, 4, 5);
+    ctx.fillRect(px + 6, py - 3, 4, 7);
+    ctx.fillRect(px + 13, py - 1, 4, 5);
+    ctx.fillStyle = '#FACC15';
+    ctx.fillRect(px, py + 4, 16, 6);
+    ctx.fillRect(px, py, 2, 4);
+    ctx.fillRect(px + 7, py - 2, 2, 6);
+    ctx.fillRect(px + 14, py, 2, 4);
+    ctx.fillStyle = '#FEF3C7';
+    ctx.fillRect(px + 1, py + 4, 14, 1);
+    ctx.fillStyle = '#DC2626';
+    ctx.fillRect(px + 7, py + 6, 2, 2);
+    ctx.fillStyle = '#2563EB';
+    ctx.fillRect(px + 3, py + 6, 1, 2);
+    ctx.fillRect(px + 12, py + 6, 1, 2);
     ctx.restore();
   }
 

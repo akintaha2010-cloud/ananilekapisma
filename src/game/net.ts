@@ -59,6 +59,7 @@ export interface NetSnapshot {
   }[];
   cannons: SimulationState['cannons'];
   events: SimulationState['pendingEvents'];
+  crown?: { holder: number | null; x?: number; y?: number; held: Record<number, number> };
 }
 
 export interface NetCallbacks {
@@ -440,6 +441,10 @@ export class OnlineClient {
       })),
       cannons: sim.cannons,
       events: eventsCopy,
+      crown:
+        sim.mode === 'crown'
+          ? { holder: sim.crownHolder ?? null, x: sim.crownX, y: sim.crownY, held: sim.crownHeld ?? {} }
+          : undefined,
     };
 
     this.broadcastToGuests({ kind: 'snapshot', snap });
@@ -459,6 +464,12 @@ export function applyNetSnapshot(sim: SimulationState, snap: NetSnapshot) {
   sim.windForce = snap.windForce;
   sim.frictionFactor = snap.frictionFactor;
   sim.cannons = snap.cannons;
+  if (snap.crown) {
+    sim.crownHolder = snap.crown.holder;
+    sim.crownX = snap.crown.x;
+    sim.crownY = snap.crown.y;
+    sim.crownHeld = snap.crown.held;
+  }
 
   for (const pSnap of snap.players) {
     const p = sim.players.find((pl) => pl.slotIndex === pSnap.slotIndex);

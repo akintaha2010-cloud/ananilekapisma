@@ -348,6 +348,13 @@ export const MainMenu: React.FC<MainMenuProps> = ({
                 <LogOut className="w-4 h-4 text-rose-300" />
                 OYUNDAN ÇIK
               </button>
+
+              <a
+                href="./klasik/"
+                className="sm:col-span-2 py-2.5 px-4 rounded-none bg-indigo-950/80 hover:bg-indigo-900 border-2 border-indigo-500 text-indigo-100 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
+              >
+                KLASİK KALE KAPIŞMASI · Kuşatma, Kara Paşa, Macera
+              </a>
             </div>
           </div>
         )}
