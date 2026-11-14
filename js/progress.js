@@ -3,7 +3,7 @@ import { COLORS, HATS, STACHES } from './character.js';
 export const SAVE_KEY = 'kale-kapismasi-kayit';
 
 const heroOf = (g) => g.players.find((p) => p.info.kind === 'hero' && p.info.control === 'human') || g.players[0];
-const won = (g) => (g.result?.team ? g.result.team === 'A' : g.result?.winnerId === heroOf(g).id);
+export const won = (g, hero = heroOf(g)) => (g.result?.team ? g.result.team === hero.team : g.result?.winnerId === hero.id);
 const livesLeft = (g) => Math.max(0, heroOf(g).lives);
 
 export const CHAPTERS = [
@@ -146,9 +146,8 @@ export const chapterUnlocked = (save, idx) => idx === 0 || (save.stars[CHAPTERS[
 export const totalStars = (save) => Object.values(save.stars).reduce((a, b) => a + b, 0);
 
 /** Applies the result of a finished match to the save. Returns { gold, stars, newStars }. */
-export function reward(save, g, chapterIdx = -1) {
-  const hero = heroOf(g);
-  const win = won(g);
+export function reward(save, g, chapterIdx = -1, hero = heroOf(g)) {
+  const win = won(g, hero);
   let gold = (win ? 25 : 8) + hero.stomps * 4 + hero.kills * 3;
   let stars = 0;
   let newStars = 0;
