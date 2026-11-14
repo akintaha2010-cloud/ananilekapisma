@@ -14,6 +14,10 @@ Oyna: https://akintaha2010-cloud.github.io/ananilekapisma/
 - Hicaz makamında küçük bir müzik ve sentezlenmiş efektler (M ile sesi kapat)
 - Bağımlılık yok: düz HTML, CSS ve JavaScript (ES modülleri) ile canvas
 
+## Hikâye
+
+Hayal Şenliği için kaleye gelen kahramanımız, şenliği yasaklayan Kara Paşa'ya karşı dinozor arkadaşı Orfe ile birlikte savaşır. 8 bölümün başında ve sonunda konuşmalı ara sahneler var (Boşluk/tıkla: devam, Esc: geç). Bölümlerin çoğu kayan ekranlı macera: sağa ilerle, pusulardaki akıncıları ve bölükbaşıları ez, altınları topla, kontrol noktalarından devam et, çıkış kapısına ulaş.
+
 ## Oynamak
 
 ```bash
