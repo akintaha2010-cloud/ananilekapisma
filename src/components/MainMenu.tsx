@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   loadFoundSecrets,
   matchSecret,
-  MENU_TIPS,
   normalizeSecretKey,
   pickQuip,
   saveFoundSecrets,
@@ -132,7 +131,6 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   onQuitApp,
 }) => {
   const [confirmQuitOpen, setConfirmQuitOpen] = useState(false);
-  const [tipIdx, setTipIdx] = useState(() => Math.floor(Math.random() * MENU_TIPS.length));
   const [activeSecret, setActiveSecret] = useState<SecretDef | null>(null);
   const [foundSecrets, setFoundSecrets] = useState<SecretId[]>(loadFoundSecrets);
   const keyBufferRef = useRef<string[]>([]);
@@ -146,11 +144,6 @@ export const MainMenu: React.FC<MainMenuProps> = ({
       saveFoundSecrets(next);
       return next;
     });
-  }, []);
-
-  useEffect(() => {
-    const t = window.setInterval(() => setTipIdx((i) => i + 1), 7000);
-    return () => window.clearInterval(t);
   }, []);
 
   useEffect(() => {
@@ -178,7 +171,6 @@ export const MainMenu: React.FC<MainMenuProps> = ({
 
   const handleTitleClick = () => {
     titleClicksRef.current += 1;
-    setTipIdx((i) => i + 1);
     if (titleClicksRef.current >= 5) {
       titleClicksRef.current = 0;
       const orpheus = SECRETS.find((s) => s.id === 'orpheus');

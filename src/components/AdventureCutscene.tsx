@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CostumeConfig } from '../game/types';
 import { CutsceneLine, CutsceneSpeaker, ORFE_COSTUME, PASA_COSTUME } from '../game/adventure';
 import { CharacterPreviewSvg } from './CharacterPreviewSvg';
@@ -53,19 +53,27 @@ export const AdventureCutscene: React.FC<AdventureCutsceneProps> = ({ title, lin
     }
   };
 
+  const advanceRef = useRef(advance);
+  advanceRef.current = advance;
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.repeat) return;
       if (e.key === 'Escape') {
         e.preventDefault();
-        onDone();
+        e.stopPropagation();
+        onDoneRef.current();
       } else if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
-        advance();
+        e.stopPropagation();
+        advanceRef.current();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
 
   if (!line) return null;
 
