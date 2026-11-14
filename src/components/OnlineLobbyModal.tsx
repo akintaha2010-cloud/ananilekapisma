@@ -114,7 +114,7 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
 
   const isHost = Boolean(room && myPeerId && room.hostPeerId === myPeerId);
   const inviteUrl = room
-    ? `${window.location.origin}/?room=${room.code}`
+    ? `${window.location.origin}${window.location.pathname}?room=${room.code}`
     : '';
 
   const handleCostumeChange = (patch: Partial<CostumeConfig>) => {
@@ -193,7 +193,7 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
               Arkadaşlarla Çevrimiçi Oyna
             </h2>
             <p className="text-xs text-slate-400">
-              WebRTC DataChannels & Bağımsız Sinyal Sunucusu · {hasTurn ? 'STUN + TURN Aktif' : 'STUN + Otomatik Aktarım Korumalı'}
+              Sunucusuz WebRTC (PeerJS) · Oda kodunu arkadaşına gönder{hasTurn ? ' · TURN aktif' : ''}
             </p>
           </div>
         </div>
