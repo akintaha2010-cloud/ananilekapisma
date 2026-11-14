@@ -258,6 +258,28 @@ export function drawHat(ctx, kind, x, y, rot, scale = 1, tassel = 0) {
  * opts: color, facing, t, sx, sy, eyes ('normal'|'x'|'closed'), armsUp (0..1),
  * walk (phase), fez (bool), alpha, tilt
  */
+
+/** Pelerin/atkı: hareketin tersine savrulan dalgalı kumaş. cape = { color, len, sway } */
+function drawCape(ctx, cape, facing, t, OW, outline) {
+  const back = -facing;
+  const len = cape.len ?? 1;
+  const sway = cape.sway ?? 0;
+  const tipX = back * (18 + 26 * len + sway * 34 * len);
+  const tipY = -8 - Math.abs(sway) * 14 * len + Math.sin(t * 7) * 3;
+  const wave = Math.sin(t * 9) * 4 * len;
+  ctx.fillStyle = cape.color;
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = OW * 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-14, -50);
+  ctx.quadraticCurveTo(tipX * 0.6, -50 + wave, tipX, tipY - 8 * len);
+  ctx.lineTo(tipX + back * 6, tipY + 6 * len);
+  ctx.quadraticCurveTo(tipX * 0.5, -20 - wave, 14, -46);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
 export function drawCharacter(ctx, x, y, opts) {
   const pal = opts.pal || palette(opts.color || COLORS[0]);
   const facing = opts.facing ?? 1;
@@ -267,11 +289,17 @@ export function drawCharacter(ctx, x, y, opts) {
   const armsUp = opts.armsUp ?? 0;
   const walk = opts.walk ?? 0;
   const look = facing * 3;
+  const OW = opts.ow ?? 1;
 
   ctx.save();
   ctx.globalAlpha = opts.alpha ?? 1;
   ctx.translate(x, y);
   if (opts.tilt) ctx.rotate(opts.tilt);
+  if (opts.spin) {
+    ctx.translate(0, -33 * sy);
+    ctx.rotate(opts.spin);
+    ctx.translate(0, 33 * sy);
+  }
   ctx.scale(sx, sy);
 
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
@@ -280,6 +308,8 @@ export function drawCharacter(ctx, x, y, opts) {
     ctx.ellipse(0, 0, 30, 5, 0, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  if (opts.cape) drawCape(ctx, opts.cape, facing, t, OW, pal.outline);
 
   const cy = -33;
   const spikes = 12;
@@ -294,13 +324,13 @@ export function drawCharacter(ctx, x, y, opts) {
   ctx.fillStyle = sg;
   ctx.fill();
   ctx.strokeStyle = pal.outline;
-  ctx.lineWidth = 1.6;
+  ctx.lineWidth = OW * 1.6;
   ctx.stroke();
 
   for (const s of [-1, 1]) {
     ctx.fillStyle = pal.body;
     ctx.strokeStyle = pal.outline;
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = OW * 1.4;
     ctx.beginPath();
     ctx.arc(s * 17 + look * 0.3, -58, 8, 0, Math.PI * 2);
     ctx.fill();
@@ -317,7 +347,7 @@ export function drawCharacter(ctx, x, y, opts) {
   bg.addColorStop(1, pal.bodyShade);
   ctx.fillStyle = bg;
   ctx.strokeStyle = pal.outline;
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = OW * 1.8;
   ctx.beginPath();
   ctx.moveTo(0, -62);
   ctx.bezierCurveTo(20, -62, 28, -46, 29, -30);
@@ -331,11 +361,12 @@ export function drawCharacter(ctx, x, y, opts) {
   const armA = -0.5 - armsUp * 1.6;
   for (const s of [-1, 1]) {
     ctx.save();
-    ctx.translate(s * 25, -30);
-    ctx.rotate(s * (armA + Math.sin(t * 6) * 0.05 * (1 - armsUp)) * -1);
+    const k = s > 0 ? 1 : 0;
+    ctx.translate(s * 25 + (opts.armOff?.[k] || 0), -30);
+    ctx.rotate(opts.arms ? opts.arms[k] : s * (armA + Math.sin(t * 6) * 0.05 * (1 - armsUp)) * -1);
     ctx.fillStyle = pal.body;
     ctx.strokeStyle = pal.outline;
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = OW * 1.4;
     ctx.beginPath();
     ctx.ellipse(s * 3, -6, 7, 10.5, s * 0.35, 0, Math.PI * 2);
     ctx.fill();
@@ -344,12 +375,14 @@ export function drawCharacter(ctx, x, y, opts) {
   }
 
   for (const s of [-1, 1]) {
-    const lift = Math.max(0, Math.sin(walk + (s > 0 ? Math.PI : 0))) * 4;
+    const ph = walk + (s > 0 ? Math.PI : 0);
+    const lift = opts.feet ? opts.feet[s > 0 ? 1 : 0] : Math.max(0, Math.sin(ph)) * 4;
+    const fx = (opts.stride || 0) * Math.cos(ph);
     ctx.fillStyle = pal.light;
     ctx.strokeStyle = pal.outline;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = OW * 1.5;
     ctx.beginPath();
-    ctx.ellipse(s * 14, -7 - lift, 11.5, 8.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(s * 14 + fx, -7 - lift, 11.5, 8.5, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
   }
@@ -389,6 +422,18 @@ export function drawCharacter(ctx, x, y, opts) {
       ctx.arc(ex + 0.9, ey - 1, 0.9, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#111';
+    }
+  }
+
+  if (eyes === 'angry') {
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(s * 14 + look, -51);
+      ctx.lineTo(s * 4 + look, -47);
+      ctx.stroke();
     }
   }
 

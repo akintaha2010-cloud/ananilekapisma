@@ -1,6 +1,8 @@
-import { WORLD } from './physics.js';
+import { WORLD, P } from './physics.js';
 import { THEMES } from './maps.js';
 import { drawCharacter, drawFez, drawHat } from './character.js';
+
+const WHITE_PAL = { body: '#ffffff', bodyShade: '#fff4f4', light: '#ffffff', spike: '#ffffff', spikeLight: '#ffffff', outline: '#ffffff', ui: '#ffffff' };
 
 const W = WORLD.w;
 const H = WORLD.h;
@@ -567,35 +569,148 @@ export function drawParticles(ctx, parts) {
   }
 }
 
+/** Sadece görsel animasyon durumu: takla, beyaz vuruş parlaması, pelerin savrulması, hız izleri. */
+export function animatePlayer(p, dt) {
+  const a = p.anim;
+  a.flash = Math.max(0, (a.flash || 0) - dt);
+  a.flip = Math.max(0, (a.flip || 0) - dt);
+  a.idle = (a.idle || 0) + dt;
+  a.cape = (a.cape || 0) + ((-p.vx * p.facing) / 500 - (a.cape || 0)) * Math.min(1, dt * 8);
+  a.poundT = p.state === 'pound' ? (a.poundT || 0) + dt : 0;
+  a.trail = (a.trail || []).filter((q) => (q.life -= dt) > 0);
+  const fast = p.state === 'pound' ? p.vy > 300 : Math.hypot(p.vx, p.vy) > 760;
+  a.trailT = (a.trailT || 0) - dt;
+  if (fast && p.state !== 'out' && a.trailT <= 0) {
+    a.trailT = 0.03;
+    a.trail.push({ x: p.x + p.w / 2, y: p.y + p.h, facing: p.facing, spin: a.spin || 0, life: 0.18 });
+  }
+}
+
+function pose(p, a, t) {
+  const f = p.facing;
+  const spd = Math.abs(p.vx);
+  const o = { arms: null, armOff: null, feet: null, stride: 0, tilt: 0, spin: 0, bob: 0, sx: 1, sy: 1, eyes: 'normal', smear: 0 };
+  if (p.state === 'pound') {
+    const k = Math.min(1, a.poundT / 0.2);
+    o.spin = k < 1 ? f * k * Math.PI * 2 : 0;
+    o.arms = k < 1 ? [-1.4, 1.4] : [-0.15, 0.15];
+    o.feet = [6, 6];
+    o.eyes = 'closed';
+    if (k >= 1) {
+      o.sx = 0.9;
+      o.sy = 1.12;
+    }
+  } else if (!p.grounded) {
+    if (a.flip > 0) o.spin = f * (1 - a.flip / 0.32) * Math.PI * 2;
+    if (p.vy < 0) {
+      o.arms = [-0.15, 0.15];
+      o.feet = [7, 2];
+      o.sx = 0.94;
+      o.sy = 1.07;
+    } else {
+      const fl = Math.sin(t * 22) * 0.35;
+      o.arms = [-1.3 - fl, 1.3 - fl];
+      o.feet = [3, 8];
+    }
+    o.tilt = Math.max(-0.2, Math.min(0.2, p.vx / 2500));
+  } else if (spd > 40) {
+    const ph = a.walk;
+    const sw = Math.sin(ph) * 0.8;
+    o.arms = [-(0.6 - sw), 0.6 + sw];
+    o.stride = 6;
+    o.tilt = f * Math.min(0.16, spd / 2600);
+    o.bob = Math.abs(Math.sin(ph)) * 4;
+  } else {
+    const br = Math.sin(a.idle * 3);
+    o.sy = 1 + br * 0.025;
+    o.sx = 1 - br * 0.015;
+    o.arms = [-0.5 - br * 0.08, 0.5 + br * 0.08];
+  }
+  if (p.shoveT > 0) {
+    const k = 1 - p.shoveT / P.shoveTime;
+    const front = f > 0 ? 1 : 0;
+    const arms = o.arms ? [...o.arms] : [-0.5, 0.5];
+    const ext = Math.sin(Math.min(1, k * 1.4) * Math.PI);
+    arms[front] = f * (k < 0.18 ? 0.2 : 1.65);
+    arms[1 - front] = -f * 1.2;
+    o.arms = arms;
+    o.armOff = [0, 0];
+    o.armOff[front] = f * 16 * ext;
+    o.tilt = f * (k < 0.18 ? -0.12 : 0.28 * ext);
+    o.eyes = 'angry';
+    o.smear = k > 0.12 && k < 0.75 ? 1 - Math.abs(k - 0.4) / 0.35 : 0;
+  }
+  return o;
+}
+
+function drawSmear(ctx, x, y, f, k, color, s) {
+  ctx.save();
+  ctx.translate(x + f * 30 * s, y - 34 * s);
+  ctx.scale(f * s, s);
+  ctx.globalAlpha = 0.75 * k;
+  const g = ctx.createLinearGradient(-10, 0, 46, 0);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(1, color);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(-6, -26);
+  ctx.quadraticCurveTo(52, -20, 48, 8);
+  ctx.quadraticCurveTo(30, -6, -6, 18);
+  ctx.quadraticCurveTo(18, -4, -6, -26);
+  ctx.fill();
+  ctx.globalAlpha = k;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(20, -18);
+  ctx.quadraticCurveTo(50, -12, 46, 6);
+  ctx.quadraticCurveTo(38, -6, 20, -18);
+  ctx.fill();
+  ctx.restore();
+}
+
 export function drawPlayer(ctx, p, info, t) {
   if (p.state === 'out') return;
   const a = p.anim;
   const x = p.x + p.w / 2;
   const y = p.y + p.h;
   let alpha = 1;
-  if (p.invuln > 0 && p.state !== 'squashed') alpha = Math.floor(t * 14) % 2 ? 0.35 : 0.95;
+  if (p.invuln > 0 && p.state !== 'squashed') alpha = Math.floor(t * 14) % 2 ? 0.55 : 1;
   const squashed = p.state === 'squashed';
   const k = p.scale || 1;
-  const sy = (squashed ? 0.26 : a.sy) * k;
-  const sx = (squashed ? 1.75 : 1 + (1 - a.sy) * 0.9) * k;
-  const walk = p.grounded && Math.abs(p.vx) > 40 ? a.walk : 0;
-  const bob = p.grounded && Math.abs(p.vx) > 40 ? Math.abs(Math.sin(a.walk)) * 3 : 0;
-  drawCharacter(ctx, x, y - bob, {
-    pal: info.pal,
+  const o = squashed ? { sx: 1, sy: 1, bob: 0, eyes: 'x', tilt: 0, spin: 0 } : pose(p, a, t);
+  const sy = (squashed ? 0.26 : a.sy * o.sy) * k;
+  const sx = (squashed ? 1.75 : (1 + (1 - a.sy) * 0.9) * o.sx) * k;
+  const enemy = p.team === 'B';
+  const big = info.kind === 'boss' || k > 1.1;
+  const cape = squashed ? null : { color: info.kind === 'boss' ? '#3b1d5e' : big ? '#9b1c2c' : info.pal.ui, len: big ? 1 : 0.55, sway: Math.max(-1, Math.min(1, a.cape || 0)) };
+  const look = {
     facing: p.facing,
     t,
     sx,
     sy,
-    walk,
-    armsUp: squashed ? 1 : p.grounded ? 0 : p.state === 'pound' ? 1 : 0.6,
-    eyes: squashed ? 'x' : p.state === 'pound' ? 'closed' : 'normal',
+    walk: a.walk,
+    stride: o.stride,
+    arms: squashed ? null : o.arms,
+    armOff: o.armOff,
+    feet: o.feet,
+    armsUp: squashed ? 1 : 0,
+    eyes: enemy && o.eyes === 'normal' ? 'angry' : o.eyes,
     fez: !squashed,
     hat: info.hat,
     stache: info.stache,
-    alpha,
-    tilt: p.shoveT > 0 ? p.facing * 0.25 : 0,
+    tilt: o.tilt,
+    spin: o.spin,
+    cape,
+    ow: 2.2,
     mustacheWiggle: p.shoveT > 0 ? -2 : 0,
-  });
+  };
+  a.spin = o.spin;
+  for (const q of a.trail || []) {
+    drawCharacter(ctx, q.x, q.y, { ...look, pal: WHITE_PAL, alpha: (q.life / 0.18) * 0.35, spin: q.spin, facing: q.facing, cape: null, shadow: false, ow: 0 });
+  }
+  drawCharacter(ctx, x, y - o.bob, { ...look, pal: info.pal, alpha });
+  if (a.flash > 0) drawCharacter(ctx, x, y - o.bob, { ...look, pal: WHITE_PAL, alpha: Math.min(1, a.flash / 0.12), shadow: false });
+  if (o.smear > 0) drawSmear(ctx, x, y - o.bob, p.facing, o.smear, info.pal.ui, k);
 
   if (!squashed) {
     const ty = p.y - 34 - (k - 1) * 30;

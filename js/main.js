@@ -149,6 +149,7 @@ function handleEvents(events) {
       case 'doublejump':
         play('doublejump');
         p.anim.sy = 1.2;
+        p.anim.flip = 0.32;
         parts.push({ kind: 'ring', x: cx, y: feet, vx: 0, vy: 0, g: 0, life: 0.35, max: 0.35, size: 34, color: info.pal.ui, rot: 0, vr: 0 });
         break;
       case 'land':
@@ -170,11 +171,13 @@ function handleEvents(events) {
         parts.push({ kind: 'ring', x: cx, y: feet, vx: 0, vy: 0, g: 0, life: 0.4, max: 0.4, size: P.shockRadius * Math.sqrt(p.scale || 1), color: '#fff', rot: 0, vr: 0 });
         break;
       case 'shocked':
+        if (e.victim) e.victim.anim.flash = 0.12;
         say('PAT!', centerX(e.victim), e.victim.y - 10, '#ffffff', 24);
         break;
       case 'stomp': {
         const v = e.victim;
         play('stomp');
+        v.anim.flash = 0.14;
         run.shake = Math.max(run.shake, e.pound ? 14 : 9);
         run.freeze = run.net === 'client' ? 0 : 0.07;
         p.anim.sy = 0.7;
@@ -193,6 +196,7 @@ function handleEvents(events) {
       case 'shoved':
       case 'clash':
         play('shoved');
+        if (e.victim) e.victim.anim.flash = 0.12;
         run.shake = Math.max(run.shake, 6);
         R.spawn(parts, 'star', (cx + centerX(e.victim)) / 2, p.y + 25, 5, { speed: 260, color: '#ffffff', life: 0.4, size: 6, g: 300 });
         if (e.type === 'shoved') say('HOP!', centerX(e.victim), e.victim.y - 14, info.pal.ui, 26);
@@ -281,6 +285,7 @@ function animate(dt) {
     a.vsy += (-(a.sy - 1) * 320 - a.vsy * 16) * dt;
     a.sy += a.vsy * dt;
     if (p.grounded) a.walk += Math.abs(p.vx) * dt * 0.05;
+    R.animatePlayer(p, dt);
   }
   R.updateParticles(run.parts, dt);
   if (g.level.adventure) {
