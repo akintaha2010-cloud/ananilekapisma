@@ -1,6 +1,18 @@
 import { ADVENTURE_CHAPTERS, AdventureChapter, AdventureProgress } from '../game/adventure';
 import { AdventureModal } from './AdventureModal';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  loadFoundSecrets,
+  matchSecret,
+  MENU_TIPS,
+  normalizeSecretKey,
+  pickQuip,
+  saveFoundSecrets,
+  SecretDef,
+  SecretId,
+  SECRETS,
+} from '../game/jokes';
+import { OrpheusSvg, SecretToast } from './SecretToast';
 import {
   Compass,
   Globe,
@@ -120,6 +132,59 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   onQuitApp,
 }) => {
   const [confirmQuitOpen, setConfirmQuitOpen] = useState(false);
+  const [tipIdx, setTipIdx] = useState(() => Math.floor(Math.random() * MENU_TIPS.length));
+  const [activeSecret, setActiveSecret] = useState<SecretDef | null>(null);
+  const [foundSecrets, setFoundSecrets] = useState<SecretId[]>(loadFoundSecrets);
+  const keyBufferRef = useRef<string[]>([]);
+  const titleClicksRef = useRef(0);
+
+  const revealSecret = useCallback((secret: SecretDef) => {
+    setActiveSecret(secret);
+    setFoundSecrets((prev) => {
+      if (prev.includes(secret.id)) return prev;
+      const next = [...prev, secret.id];
+      saveFoundSecrets(next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const t = window.setInterval(() => setTipIdx((i) => i + 1), 7000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    if (!activeSecret) return;
+    const t = window.setTimeout(() => setActiveSecret(null), 5000);
+    return () => window.clearTimeout(t);
+  }, [activeSecret]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
+      const buf = keyBufferRef.current;
+      buf.push(normalizeSecretKey(e.key));
+      if (buf.length > 16) buf.shift();
+      const hit = matchSecret(buf);
+      if (hit) {
+        keyBufferRef.current = [];
+        revealSecret(hit);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [revealSecret]);
+
+  const handleTitleClick = () => {
+    titleClicksRef.current += 1;
+    setTipIdx((i) => i + 1);
+    if (titleClicksRef.current >= 5) {
+      titleClicksRef.current = 0;
+      const orpheus = SECRETS.find((s) => s.id === 'orpheus');
+      if (orpheus) revealSecret(orpheus);
+    }
+  };
 
   const activeMode =
     GAME_MODES.find((m) => m.id === settings.mode) ?? GAME_MODES[0];
@@ -205,173 +270,123 @@ export const MainMenu: React.FC<MainMenuProps> = ({
               </div>
             </div>
 
-            {/* Emblem & Title */}
-            <div className="flex flex-col items-center text-center mt-4">
-              <svg
-                viewBox="0 0 64 24"
-                shapeRendering="crispEdges"
-                className="w-36 h-12 mb-1"
-                aria-hidden="true"
+            {/* Title */}
+            <div className="flex flex-col items-center text-center mt-4 select-none">
+              <button
+                type="button"
+                onClick={handleTitleClick}
+                data-testid="menu-title"
+                className="cursor-pointer bg-transparent border-0"
+                aria-label="Kale Kapmaca"
               >
-                <rect x="6" y="10" width="12" height="12" fill="#334155" />
-                <rect x="6" y="8" width="4" height="2" fill="#475569" />
-                <rect x="14" y="8" width="4" height="2" fill="#475569" />
-                <rect x="8" y="4" width="8" height="4" fill="#9A3412" />
-                <rect x="10" y="2" width="4" height="2" fill="#F59E0B" />
-                <rect x="46" y="10" width="12" height="12" fill="#334155" />
-                <rect x="46" y="8" width="4" height="2" fill="#475569" />
-                <rect x="54" y="8" width="4" height="2" fill="#475569" />
-                <rect x="48" y="4" width="8" height="4" fill="#9A3412" />
-                <rect x="50" y="2" width="4" height="2" fill="#F59E0B" />
-                <rect x="18" y="14" width="28" height="8" fill="#1E293B" />
-                <rect x="18" y="12" width="4" height="2" fill="#475569" />
-                <rect x="42" y="12" width="4" height="2" fill="#475569" />
-                <rect x="6" y="21" width="52" height="2" fill="#F59E0B" />
-                <rect x="26" y="6" width="12" height="10" fill="#DC2626" />
-                <rect x="25" y="13" width="14" height="3" fill="#DC2626" />
-                <rect x="27" y="7" width="2" height="6" fill="#FF8A95" />
-                <rect x="25" y="14" width="14" height="2" fill="#FDE047" />
-                <rect x="31" y="4" width="2" height="2" fill="#FDE047" />
-                <rect x="33" y="5" width="3" height="2" fill="#0F172A" />
-                <rect x="35" y="7" width="2" height="5" fill="#0F172A" />
-              </svg>
-
-              <h1 className="font-display text-4xl md:text-5xl font-bold tracking-wide text-amber-300">
-                KALE KAPMACA
-              </h1>
-
-              <div className="mt-1.5 mb-4 flex flex-wrap items-center justify-center gap-2 text-xs font-medium text-slate-300">
-                <span>{activeMode.title}</span>
-                <span aria-hidden="true">·</span>
-                <span>{activeMap.title}</span>
-                <span aria-hidden="true">·</span>
-                <span>
+                <h1 className="font-display text-5xl md:text-6xl font-bold tracking-wide text-amber-300 dtm-title">
+                  KALE KAPMACA
+                </h1>
+              </button>
+              <div className="mt-2 font-display text-[11px] font-bold tracking-[0.3em] text-rose-300">
+                HAVEN ANKARA BASKISI
+              </div>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-semibold">
+                <span className="px-2 py-0.5 bg-slate-900 border border-slate-700 text-amber-200">{activeMode.title}</span>
+                <span className="px-2 py-0.5 bg-slate-900 border border-slate-700 text-cyan-200">{activeMap.title}</span>
+                <span className="px-2 py-0.5 bg-slate-900 border border-slate-700 text-emerald-200">
                   {activeHumans} Oyuncu / {activeBots} Bot
                 </span>
               </div>
             </div>
 
-            {/* Primary CTA Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={onStartGame}
-                data-start="true"
-                className="py-3.5 px-5 rounded-none bg-amber-500 hover:bg-amber-400 border-2 border-amber-200 text-slate-950 font-display font-bold text-lg tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
-              >
-                <Play className="w-5 h-5 fill-current" />
-                HIZLI OYNA
-              </button>
+            {/* Main actions */}
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-[1.35fr_1fr] gap-3">
+              <div className="flex flex-col gap-2.5">
+                <button
+                  type="button"
+                  onClick={onStartGame}
+                  data-start="true"
+                  className="py-4 px-5 justify-center bg-amber-500 hover:bg-amber-400 border-amber-200 text-slate-950 text-xl tracking-wide rounded-none font-display font-bold flex items-center gap-2.5 cursor-pointer dtm-btn"
+                >
+                  <Play className="w-6 h-6 fill-current" />
+                  HIZLI OYNA
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSetSubView('adventure')}
+                  data-testid="menu-adventure-btn"
+                  className="py-3 px-4 bg-rose-700 hover:bg-rose-600 border-rose-200 text-white text-sm rounded-none font-display font-bold flex items-center gap-2.5 cursor-pointer dtm-btn"
+                >
+                  <Swords className="w-5 h-5 shrink-0" />
+                  <span className="flex-1 text-left">MACERA: KARA PAŞA</span>
+                  <span className="text-xs bg-black/30 px-1.5 py-0.5">{adventureProgress.completed.length}/{ADVENTURE_CHAPTERS.length}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSetSubView('saga')}
+                  data-testid="menu-saga-btn"
+                  className="py-3 px-4 bg-pink-600 hover:bg-pink-500 border-pink-200 text-white text-sm rounded-none font-display font-bold flex items-center gap-2.5 cursor-pointer dtm-btn"
+                >
+                  <MapIcon className="w-5 h-5 shrink-0" />
+                  <span className="flex-1 text-left">SEVİYE HARİTASI</span>
+                  <span className="text-xs bg-black/30 px-1.5 py-0.5">{sagaProgress.highestUnlockedLevel}/15</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSetSubView('story')}
+                  data-testid="menu-story-btn"
+                  className="py-3 px-4 bg-teal-700 hover:bg-teal-600 border-teal-200 text-white text-sm rounded-none font-display font-bold flex items-center gap-2.5 cursor-pointer dtm-btn"
+                >
+                  <Compass className="w-5 h-5 shrink-0" />
+                  <span className="flex-1 text-left">HİKÂYE</span>
+                  <span className="text-xs bg-black/30 px-1.5 py-0.5">{storyProgress.completedChapters.length}/7</span>
+                </button>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => onSetSubView('saga')}
-                data-testid="menu-saga-btn"
-                className="py-3.5 px-5 rounded-none bg-pink-600 hover:bg-pink-500 border-2 border-pink-200 text-white font-display font-bold text-lg tracking-wide flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
-              >
-                <MapIcon className="w-5 h-5" />
-                SEVİYE HARİTASI ({sagaProgress.highestUnlockedLevel}/15)
-              </button>
+              <div className="grid grid-cols-2 md:grid-cols-1 gap-2 content-start">
+                {[
+                  { view: 'online' as const, id: 'menu-online-btn', label: 'ÇEVRİMİÇİ', icon: Globe, color: 'text-sky-300' },
+                  { view: 'characters' as const, id: 'menu-characters-btn', label: 'KAHRAMANLAR', icon: Users, color: 'text-amber-300' },
+                  { view: 'modes' as const, id: 'menu-modes-btn', label: 'MODLAR & HARİTA', icon: Sparkles, color: 'text-fuchsia-300' },
+                  {
+                    view: 'achievements' as const,
+                    id: 'menu-achievements-btn',
+                    label: `BAŞARIMLAR ${achievementState.unlockedIds.length}/${ACHIEVEMENTS.length}`,
+                    icon: Trophy,
+                    color: 'text-yellow-300',
+                  },
+                  { view: 'settings' as const, id: 'menu-settings-btn', label: 'AYARLAR', icon: Settings, color: 'text-slate-300' },
+                  { view: 'howto' as const, id: 'menu-howto-btn', label: 'NASIL OYNANIR', icon: HelpCircle, color: 'text-emerald-300' },
+                ].map((b) => (
+                  <button
+                    key={b.view}
+                    type="button"
+                    onClick={() => onSetSubView(b.view)}
+                    data-testid={b.id}
+                    className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 border-slate-500 text-slate-100 text-xs rounded-none font-display font-bold flex items-center gap-2.5 cursor-pointer dtm-btn"
+                  >
+                    <b.icon className={`w-4 h-4 shrink-0 ${b.color}`} />
+                    {b.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onSetSubView('adventure')}
-              data-testid="menu-adventure-btn"
-              className="w-full mt-2.5 py-3.5 px-4 rounded-none bg-rose-700 hover:bg-rose-600 border-2 border-rose-200 text-white font-display font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
-            >
-              <Swords className="w-5 h-5 shrink-0" />
-              MACERA: KARA PAŞA ({adventureProgress.completed.length}/{ADVENTURE_CHAPTERS.length})
-            </button>
-
-            {/* Secondary Mode Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-2.5">
-              <button
-                type="button"
-                onClick={() => onSetSubView('story')}
-                data-testid="menu-story-btn"
-                className="py-3 px-3 rounded-none bg-teal-950/90 hover:bg-teal-900 border-2 border-teal-500 text-teal-100 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
-              >
-                <Compass className="w-4 h-4 text-teal-300 shrink-0" />
-                HİKÂYE ({storyProgress.completedChapters.length}/7)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onSetSubView('online')}
-                data-testid="menu-online-btn"
-                className="py-3 px-3 rounded-none bg-sky-950/90 hover:bg-sky-900 border-2 border-sky-500 text-sky-100 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
-              >
-                <Globe className="w-4 h-4 text-sky-300 shrink-0" />
-                ÇEVRİMİÇİ OYNA
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onSetSubView('characters')}
-                data-testid="menu-characters-btn"
-                className="py-3 px-3 rounded-none bg-slate-900 hover:bg-slate-800 border-2 border-amber-500/50 text-amber-100 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
-              >
-                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                KAHRAMAN & AKSESUAR
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onSetSubView('modes')}
-                className="py-3 px-3 rounded-none bg-slate-900 hover:bg-slate-800 border-2 border-slate-600 text-amber-100 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
-              >
-                <Swords className="w-4 h-4 text-amber-400 shrink-0" />
-                MODLAR & HARİTA
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onSetSubView('achievements')}
-                data-testid="menu-achievements-btn"
-                className="py-3 px-3 rounded-none bg-slate-900 hover:bg-slate-800 border-2 border-slate-600 text-amber-100 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
-              >
-                <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
-                BAŞARIMLAR ({achievementState.unlockedIds.length}/{ACHIEVEMENTS.length})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onSetSubView('settings')}
-                data-testid="menu-settings-btn"
-                className="py-3 px-3 rounded-none bg-slate-900 hover:bg-slate-800 border-2 border-slate-600 text-amber-100 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
-              >
-                <Settings className="w-4 h-4 text-amber-400 shrink-0" />
-                KONTROLLER & AYAR
-              </button>
+            {/* Funny tip ticker */}
+            <div className="mt-4 bg-slate-900 border-2 border-slate-700 px-3 py-2 flex items-center gap-2.5 min-h-[40px]">
+              <OrpheusSvg size={24} className="shrink-0" />
+              <span key={tipIdx} className="text-xs text-slate-200 tip-in" data-testid="menu-tip">
+                {pickQuip(MENU_TIPS, tipIdx)}
+              </span>
             </div>
 
-            {/* Footer Utility Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2.5">
-              <button
-                type="button"
-                onClick={() => onSetSubView('howto')}
-                className="py-2.5 px-4 rounded-none bg-slate-900/90 hover:bg-slate-800 border-2 border-slate-700 text-slate-200 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
-              >
-                <HelpCircle className="w-4 h-4 text-amber-400" />
-                NASIL OYNANIR
-              </button>
-
-              <button
-                type="button"
-                onClick={handleRequestQuit}
-                className="py-2.5 px-4 rounded-none bg-rose-950/80 hover:bg-rose-900 border-2 border-rose-600 text-rose-100 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
-              >
-                <LogOut className="w-4 h-4 text-rose-300" />
-                OYUNDAN ÇIK
-              </button>
-
+            {/* Footer */}
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px]">
               <a
                 href="./klasik/"
-                className="sm:col-span-2 py-2.5 px-4 rounded-none bg-indigo-950/80 hover:bg-indigo-900 border-2 border-indigo-500 text-indigo-100 font-display font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
+                className="py-1.5 px-3 bg-indigo-950/80 hover:bg-indigo-900 border-2 border-indigo-500 text-indigo-100 font-display font-bold pixel-btn"
               >
-                KLASİK KALE KAPIŞMASI · Kuşatma, Kara Paşa, Macera
+                KLASİK KALE KAPIŞMASI
               </a>
+              <span className="font-display font-bold text-[#FF8C9E]" data-testid="menu-secret-count">
+                Gizli sırlar: {foundSecrets.length}/{SECRETS.length}
+              </span>
             </div>
           </div>
         )}
@@ -482,6 +497,15 @@ export const MainMenu: React.FC<MainMenuProps> = ({
           />
         )}
       </div>
+
+      {activeSecret && (
+        <SecretToast
+          secret={activeSecret}
+          found={foundSecrets.length}
+          total={SECRETS.length}
+          onClose={() => setActiveSecret(null)}
+        />
+      )}
 
       {/* Quit Confirmation Dialog */}
       {confirmQuitOpen && (
