@@ -1,5 +1,5 @@
-import { centerX, isActive } from './physics.js';
-import { MOAT_LEFT, MOAT_RIGHT } from './level.js';
+import { centerX, isActive, sameTeam } from './physics.js';
+import { waterInfo, floorUnder } from './maps.js';
 import { emptyInput } from './input.js';
 
 export const DIFFICULTY = {
@@ -24,11 +24,13 @@ export function createBrain(level = 'orta', rand = Math.random) {
     lastJump: false,
     downTap: false,
     shoveTap: false,
+    leap: 0,
+    leapT: 0,
   };
 }
 
 function pickTarget(p, brain, players) {
-  const others = players.filter((o) => o !== p && o.state !== 'out' && o.lives > 0);
+  const others = players.filter((o) => o !== p && o.state !== 'out' && o.lives > 0 && !sameTeam(p, o));
   if (!others.length) return null;
   const current = others.find((o) => o.id === brain.targetId);
   if (current && brain.targetT > 0) return current;
@@ -63,17 +65,19 @@ function platformAbove(p, level, tx) {
   return best;
 }
 
-function decide(p, brain, players, level) {
+function decide(p, brain, players, level, world) {
   const d = brain.diff;
   const r = brain.rand;
   const me = centerX(p);
   const feet = p.y + p.h;
   brain.dir = 0;
+  const goal = world?.mode?.aiGoal?.(world, p, brain) || null;
 
   const threat = players.find(
     (o) =>
       o !== p &&
       isActive(o) &&
+      !sameTeam(p, o) &&
       Math.abs(centerX(o) - me) < 70 &&
       o.y + o.h < p.y + 10 &&
       o.y + o.h > p.y - 220 &&
@@ -85,7 +89,28 @@ function decide(p, brain, players, level) {
     return;
   }
 
-  if (brain.mode === 'roam') {
+  if (goal?.flee) {
+    const near = players
+      .filter((o) => o !== p && isActive(o) && !sameTeam(p, o))
+      .sort((a, b) => Math.abs(centerX(a) - me) - Math.abs(centerX(b) - me))[0];
+    if (near) {
+      const away = centerX(near) < me ? 1 : -1;
+      const room = waterInfo(level, me);
+      brain.dir = room.dist < 120 && room.side === away ? -away : away;
+      if (p.grounded && (Math.abs(centerX(near) - me) < 140 || r() < 0.2)) {
+        brain.jumpQueued = true;
+        brain.jumpHold = 0.3;
+      }
+    }
+    return;
+  }
+
+  if (goal && goal.x !== undefined) {
+    chasePoint(p, brain, level, goal.x, goal.y ?? level.floorY, goal.stay);
+    return;
+  }
+
+  if (brain.mode === 'roam' && !goal?.targetId) {
     const gx = brain.roamX;
     brain.dir = Math.abs(gx - me) > 30 ? Math.sign(gx - me) : 0;
     if (p.grounded && r() < 0.12) {
@@ -95,6 +120,10 @@ function decide(p, brain, players, level) {
     return;
   }
 
+  if (goal?.targetId !== undefined) {
+    brain.targetId = goal.targetId;
+    brain.targetT = 0.5;
+  }
   const target = pickTarget(p, brain, players);
   if (!target) return;
   const tx = centerX(target);
@@ -131,7 +160,7 @@ function decide(p, brain, players, level) {
       brain.jumpHold = 0.18;
     }
     if (Math.abs(dx) < 85 && Math.abs(dy) < 30 && p.shoveCd <= 0) {
-      const nearEdge = tx < MOAT_LEFT + 200 || tx > MOAT_RIGHT - 200 || !target.platform?.solid;
+      const nearEdge = waterInfo(level, tx).dist < 200 || !target.platform?.solid;
       if (r() < (nearEdge ? d.aim : 0.25)) brain.shoveTap = true;
     }
   }
@@ -141,7 +170,32 @@ function decide(p, brain, players, level) {
   if (r() < d.err) brain.dir = r() < 0.5 ? -1 : 1;
 }
 
-export function aiInput(p, brain, players, level, dt) {
+function chasePoint(p, brain, level, gx, gy, stay) {
+  const me = centerX(p);
+  const feet = p.y + p.h;
+  const dx = gx - me;
+  const dy = gy - feet;
+  if (dy < -60) {
+    const goal = platformAbove(p, level, gx);
+    const tx = goal ? goal.x : gx;
+    brain.dir = Math.abs(tx - me) > 20 ? Math.sign(tx - me) : 0;
+    if (p.grounded && Math.abs(tx - me) < 110) {
+      brain.jumpQueued = true;
+      brain.jumpHold = 0.3;
+    } else if (!p.grounded && p.vy > -60 && p.airJumps > 0 && goal && feet > goal.pl.y + 5) {
+      brain.jumpQueued = true;
+      brain.jumpHold = 0.25;
+    }
+  } else if (dy > 60 && p.grounded && p.platform && !p.platform.solid && Math.abs(dx) < 200) {
+    brain.downTap = true;
+    brain.dir = Math.sign(dx);
+  } else {
+    brain.dir = Math.abs(dx) > (stay ? 26 : 10) ? Math.sign(dx) : 0;
+    if (stay && !brain.dir && p.shoveCd <= 0 && brain.rand() < 0.3) brain.shoveTap = true;
+  }
+}
+
+export function aiInput(p, brain, players, level, dt, world) {
   const out = emptyInput();
   if (!isActive(p)) return out;
   brain.think -= dt;
@@ -157,22 +211,35 @@ export function aiInput(p, brain, players, level, dt) {
   }
   if (brain.think <= 0) {
     brain.think = brain.diff.react * (0.7 + brain.rand() * 0.6);
-    decide(p, brain, players, level);
+    decide(p, brain, players, level, world);
   }
 
   let dir = brain.dir;
   const me = centerX(p);
-  const overWater = me < MOAT_LEFT + 10 || me > MOAT_RIGHT - 10;
-  const nearOuterEdge = me < MOAT_LEFT + 40 || me > MOAT_RIGHT - 40;
-  const towardCenter = me < 640 ? 1 : -1;
-  if (!p.grounded && overWater) {
-    dir = towardCenter;
+  const wi = waterInfo(level, me);
+  brain.leapT -= dt;
+  if (brain.leapT <= 0) brain.leap = 0;
+  if (p.grounded && brain.leap && p.platform?.kind === 'floor' && brain.leapT < 1.1) brain.leap = 0;
+  if (!p.grounded && brain.leap) {
+    dir = brain.leap;
     if (p.vy > 0 && p.airJumps > 0 && !brain.lastJump) {
       brain.jumpQueued = true;
       brain.jumpHold = 0.3;
     }
-  } else if (p.grounded && nearOuterEdge && dir === -towardCenter) {
-    dir = 0;
+  } else if (!p.grounded && (wi.over || wi.dist < 10)) {
+    dir = wi.over ? wi.side : -wi.side;
+    if (p.vy > 0 && p.airJumps > 0 && !brain.lastJump) {
+      brain.jumpQueued = true;
+      brain.jumpHold = 0.3;
+    }
+  } else if (p.grounded && p.platform?.kind === 'floor' && wi.dist < 40 && dir === wi.side) {
+    const across = floorUnder(level, me + dir * 300);
+    if (across && across !== p.platform) {
+      brain.leap = dir;
+      brain.leapT = 1.4;
+      brain.jumpQueued = true;
+      brain.jumpHold = 0.3;
+    } else dir = 0;
   }
 
   if (brain.jumpQueued && !brain.lastJump) {
