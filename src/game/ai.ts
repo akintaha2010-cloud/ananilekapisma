@@ -1,6 +1,7 @@
 import { getHeroDef } from './characters';
 import { ARENA_WIDTH } from './constants';
 import {
+  AiPersonality,
   CharacterEntity,
   PlatformState,
   PlayerInputState,
@@ -113,7 +114,7 @@ function isBlockingCeilingAbove(
   return false;
 }
 
-export function computeBotInput(
+function computeRawBotInput(
   bot: CharacterEntity,
   sim: SimulationState,
   dt: number
@@ -216,6 +217,7 @@ export function computeBotInput(
     return input;
   }
 
+  reachedCombat = true;
   // 3. Pick smartest enemy target
   const isTeamMode =
     sim.mode === 'team' || sim.mode === 'story' || sim.mode === 'saga' || sim.mode === 'adventure';
@@ -431,4 +433,176 @@ export function computeBotInput(
   }
 
   return input;
+}
+
+let reachedCombat = false;
+
+interface BotMind {
+  react: number;
+  held: PlayerInputState;
+  attackCd: number;
+  commit: number;
+  retreat: number;
+  idle: number;
+  abilityGate: number;
+  lastStomps: number;
+}
+
+const minds = new WeakMap<CharacterEntity, BotMind>();
+
+const REACTION: Record<AiPersonality, [number, number]> = {
+  aggressive: [0.13, 0.24],
+  balanced: [0.17, 0.3],
+  defensive: [0.2, 0.34],
+  chaotic: [0.12, 0.38],
+};
+
+const ATTACK_CD: Record<AiPersonality, [number, number]> = {
+  aggressive: [0.75, 1.4],
+  balanced: [1.0, 1.9],
+  defensive: [1.4, 2.4],
+  chaotic: [0.6, 2.2],
+};
+
+const DODGE_CHANCE: Record<AiPersonality, number> = {
+  aggressive: 0.5,
+  balanced: 0.65,
+  defensive: 0.8,
+  chaotic: 0.4,
+};
+
+const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+const emptyInput = (): PlayerInputState => ({
+  left: false,
+  right: false,
+  upHeld: false,
+  jumpPressed: false,
+  down: false,
+  abilityPressed: false,
+});
+
+function nearestEnemy(bot: CharacterEntity, sim: SimulationState): CharacterEntity | null {
+  const teamMode =
+    sim.mode === 'team' || sim.mode === 'story' || sim.mode === 'saga' || sim.mode === 'adventure';
+  let best: CharacterEntity | null = null;
+  let bestD = Infinity;
+  for (const p of sim.players) {
+    if (p === bot || !p.alive || p.eliminated || (teamMode && p.team === bot.team)) continue;
+    const d = Math.abs(p.x - bot.x) + Math.abs(p.y - bot.y) * 0.6;
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
+}
+
+/**
+ * Human-like layer on top of the raw tactical policy: reaction delay,
+ * attack cooldowns, spacing/retreat after a hit, imperfect dodges and
+ * short hesitations. Survival manoeuvres (edges, hazards) stay instant.
+ */
+export function computeBotInput(
+  bot: CharacterEntity,
+  sim: SimulationState,
+  dt: number
+): PlayerInputState {
+  const p = bot.aiPersonality;
+  let mind = minds.get(bot);
+  if (!mind) {
+    mind = {
+      react: rand(0.2, 0.45),
+      held: emptyInput(),
+      attackCd: rand(0.6, 1.4),
+      commit: 0,
+      retreat: 0,
+      idle: 0,
+      abilityGate: rand(1.5, 3),
+      lastStomps: bot.stomps,
+    };
+    minds.set(bot, mind);
+  }
+  mind.react -= dt;
+  mind.attackCd -= dt;
+  mind.commit -= dt;
+  mind.retreat -= dt;
+  mind.idle -= dt;
+  mind.abilityGate -= dt;
+
+  reachedCombat = false;
+  const raw = computeRawBotInput(bot, sim, dt);
+  if (!reachedCombat) {
+    mind.held = { ...raw, jumpPressed: false, abilityPressed: false };
+    return raw;
+  }
+
+  if (bot.stomps > mind.lastStomps) {
+    mind.retreat = rand(0.7, 1.3);
+    mind.commit = 0;
+    mind.attackCd = Math.max(mind.attackCd, rand(...ATTACK_CD[p]));
+  }
+  mind.lastStomps = bot.stomps;
+
+  if (mind.react > 0) {
+    const out = { ...mind.held, jumpPressed: false, abilityPressed: false };
+    out.upHeld = raw.upHeld && bot.vy < 0;
+    if (mind.commit > 0) out.down = raw.down;
+    return out;
+  }
+  mind.react = rand(...REACTION[p]);
+
+  const decided: PlayerInputState = { ...raw };
+  const target = nearestEnemy(bot, sim);
+  if (target) {
+    const dx = target.x + target.w / 2 - (bot.x + bot.w / 2);
+    const absDx = Math.abs(dx);
+    const threatened =
+      target.y < bot.y - 20 && absDx < 72 && target.vy > 30 && bot.grounded;
+
+    if (threatened && Math.random() > DODGE_CHANCE[p]) {
+      decided.left = mind.held.left;
+      decided.right = mind.held.right;
+      decided.jumpPressed = false;
+      decided.abilityPressed = false;
+    } else if (mind.idle > 0 && !threatened) {
+      decided.left = false;
+      decided.right = false;
+      decided.jumpPressed = false;
+      decided.down = false;
+    } else if (mind.retreat > 0 && !threatened) {
+      decided.left = dx > 0;
+      decided.right = dx < 0;
+      decided.jumpPressed = false;
+      decided.down = false;
+    } else if (mind.attackCd > 0 && mind.commit <= 0 && !threatened) {
+      if (absDx < 110) {
+        decided.left = dx > 0;
+        decided.right = dx < 0;
+      } else if (absDx < 175) {
+        decided.left = false;
+        decided.right = false;
+        if (Math.random() < 0.45) {
+          decided.left = dx < 0;
+          decided.right = dx > 0;
+        }
+      }
+      if (decided.jumpPressed && target.y >= bot.y - 40) decided.jumpPressed = false;
+      decided.down = false;
+    } else if (decided.jumpPressed && absDx < 170 && mind.commit <= 0) {
+      mind.attackCd = rand(...ATTACK_CD[p]);
+      mind.commit = 0.9;
+    }
+
+    if (mind.idle <= 0 && mind.retreat <= 0 && mind.commit <= 0 && Math.random() < 0.05) {
+      mind.idle = rand(0.15, 0.45);
+    }
+  }
+
+  if (decided.abilityPressed) {
+    if (mind.abilityGate > 0) decided.abilityPressed = false;
+    else mind.abilityGate = rand(2, 4.5);
+  }
+  mind.held = { ...decided, jumpPressed: false, abilityPressed: false };
+  return decided;
 }
