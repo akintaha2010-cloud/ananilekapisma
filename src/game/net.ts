@@ -13,6 +13,7 @@ import {
 
 export interface NetSnapshot {
   seq: number;
+  countdown: number;
   elapsedSec: number;
   timeRemainingSec: number;
   hazardPhase: SimulationState['hazardPhase'];
@@ -395,6 +396,7 @@ export class OnlineClient {
     if (!this.isHost()) return;
     const snap: NetSnapshot = {
       seq: ++this.snapSeq,
+      countdown: sim.countdown,
       elapsedSec: sim.elapsedSec,
       timeRemainingSec: sim.timeRemainingSec,
       hazardPhase: sim.hazardPhase,
@@ -457,6 +459,7 @@ export class OnlineClient {
 }
 
 export function applyNetSnapshot(sim: SimulationState, snap: NetSnapshot) {
+  sim.countdown = snap.countdown ?? 0;
   sim.elapsedSec = snap.elapsedSec;
   sim.timeRemainingSec = snap.timeRemainingSec;
   sim.hazardPhase = snap.hazardPhase;

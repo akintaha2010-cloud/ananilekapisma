@@ -295,6 +295,7 @@ export interface StoryMatchRule {
 export interface SimulationState {
   mode: GameModeId;
   mapId: MapId;
+  countdown: number;
   elapsedSec: number;
   timeRemainingSec: number;
   hitstopTimer: number;
@@ -346,6 +347,7 @@ export interface HudPlayerSummary {
 export interface HudSnapshot {
   mode: GameModeId;
   mapId: MapId;
+  countdown: number;
   elapsedSec: number;
   timeRemainingSec: number;
   aliveCount: number;

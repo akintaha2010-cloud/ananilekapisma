@@ -156,6 +156,23 @@ class SoundEngine {
     osc.stop(now + 0.07);
   }
 
+  public playCountdown(final: boolean) {
+    const ctx = this.ensureContext();
+    if (!ctx || !this.sfxGain || this.settings.muted) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    const len = final ? 0.42 : 0.16;
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(final ? 880 : 440, now);
+    g.gain.setValueAtTime(0.16, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + len);
+    osc.connect(g);
+    g.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + len + 0.02);
+  }
+
   public playJump(isDouble = false) {
     const ctx = this.ensureContext();
     if (!ctx || !this.sfxGain || this.settings.muted) return;

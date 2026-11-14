@@ -116,6 +116,7 @@ export function createSimulation(
   return {
     mode: settings.mode,
     mapId: settings.mapId,
+    countdown: 0,
     elapsedSec: 0,
     timeRemainingSec:
       settings.mode === 'time' || settings.mode === 'crown'
@@ -1127,6 +1128,11 @@ export function stepSimulation(
 
   if (sim.finished) return;
 
+  if (sim.countdown > 0) {
+    sim.countdown = Math.max(0, sim.countdown - dt);
+    return;
+  }
+
   if (sim.hitstopTimer > 0) {
     sim.hitstopTimer = Math.max(0, sim.hitstopTimer - dt);
     return;
@@ -1274,6 +1280,7 @@ export function buildHudSnapshot(sim: SimulationState): HudSnapshot {
   return {
     mode: sim.mode,
     mapId: sim.mapId,
+    countdown: sim.countdown,
     elapsedSec: sim.elapsedSec,
     timeRemainingSec: sim.timeRemainingSec,
     aliveCount: sim.players.filter((p) => !p.eliminated).length,

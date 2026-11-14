@@ -80,6 +80,7 @@ import {
   StoryProgress,
 } from './game/types';
 
+const MATCH_COUNTDOWN_SEC = 3.6;
 const STORAGE_KEY = 'kale_kapmaca_prefs_v1';
 
 function loadSavedState(): { settings: GameSettings; slots: PlayerSlotConfig[] } {
@@ -316,6 +317,7 @@ export default function App() {
   const onlineRoomRef = useRef<OnlineRoomState | null>(null);
   const onlinePeerIdRef = useRef<string | null>(null);
   const isOnlineMatchRef = useRef<boolean>(false);
+  const lastStartAtRef = useRef(0);
   const guestInputsRef = useRef<Record<number, PlayerInputState>>({});
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -603,6 +605,7 @@ export default function App() {
     };
     const onlineSlots = buildOnlineSlots(room);
     const freshSim = createSimulation(onlineSettings, onlineSlots);
+    freshSim.countdown = MATCH_COUNTDOWN_SEC;
     simRef.current = freshSim;
     setRoundResult(null);
     setHud(buildHudSnapshot(freshSim));
@@ -668,6 +671,9 @@ export default function App() {
   }, [beginOnlineMatch, finalizeRound]);
 
   const startLocalGame = useCallback((fromUserGesture = true) => {
+    const nowMs = performance.now();
+    if (nowMs - lastStartAtRef.current < 600) return;
+    lastStartAtRef.current = nowMs;
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
@@ -729,6 +735,7 @@ export default function App() {
       freshSim = createSimulation(settingsRef.current, slotsRef.current);
     }
 
+    freshSim.countdown = MATCH_COUNTDOWN_SEC;
     simRef.current = freshSim;
     setRoundResult(null);
     setHud(buildHudSnapshot(freshSim));
@@ -982,14 +989,6 @@ export default function App() {
     };
   }, []);
 
-  // ?autostart=1 support
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('autostart') === '1') {
-      startLocalGame(false);
-    }
-  }, [startLocalGame]);
-
   // Mount Canvas simulation loop & InputHub once
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1032,15 +1031,7 @@ export default function App() {
       }
 
       if (screenStateRef.current === 'title') {
-        if (
-          menuSubViewRef.current === 'home' &&
-          (e.code === 'Enter' || e.code === 'Space')
-        ) {
-          e.preventDefault();
-          activeStoryRef.current = null;
-    activeAdventureRef.current = null;
-          startLocalGame(true);
-        } else if (e.code === 'Escape' && menuSubViewRef.current !== 'home') {
+        if (e.code === 'Escape' && menuSubViewRef.current !== 'home') {
           setMenuSubView('home');
         }
         return;
@@ -1050,17 +1041,11 @@ export default function App() {
         if (e.code === 'Escape' || e.code === 'KeyP') {
           e.preventDefault();
           pauseGame();
-        } else if (e.code === 'KeyR' && !isOnlineMatchRef.current) {
-          e.preventDefault();
-          startLocalGame(true);
         }
       } else if (screenStateRef.current === 'paused') {
         if (e.code === 'Escape' || e.code === 'KeyP') {
           e.preventDefault();
           resumeGame();
-        } else if (e.code === 'KeyR' && !isOnlineMatchRef.current) {
-          e.preventDefault();
-          startLocalGame(true);
         }
       }
     };
@@ -1070,6 +1055,8 @@ export default function App() {
     let lastTime = performance.now();
     let totalTime = 0;
     let hudSyncAccum = 0;
+    let titleRenderAccum = 1;
+    let lastCountdownTick = 0;
     let netSyncAccum = 0;
     let lastHudSignature = '';
 
@@ -1082,27 +1069,18 @@ export default function App() {
       const state = screenStateRef.current;
 
       if (state === 'title') {
-        const attractSim = attractSimRef.current;
-        const botInputs: Record<number, PlayerInputState> = {};
-        for (const p of attractSim.players) {
-          botInputs[p.slotIndex] = computeBotInput(p, attractSim, dt);
+        titleRenderAccum += dt;
+        if (titleRenderAccum >= 1 / 24) {
+          titleRenderAccum = 0;
+          renderer.render(
+            ctx,
+            canvas.clientWidth,
+            canvas.clientHeight,
+            attractSimRef.current,
+            totalTime,
+            true
+          );
         }
-        stepSimulation(
-          attractSim,
-          botInputs,
-          dt,
-          settingsRef.current.controls.jumpCutEnabled
-        );
-        renderer.consumeEvents(attractSim.pendingEvents);
-        renderer.updateParticles(dt);
-        renderer.render(
-          ctx,
-          canvas.clientWidth,
-          canvas.clientHeight,
-          attractSim,
-          totalTime,
-          true
-        );
       } else if (state === 'playing') {
         const sim = simRef.current;
         const isOnline = isOnlineMatchRef.current;
@@ -1188,6 +1166,12 @@ export default function App() {
           else if (ev.type === 'ability') soundEngine.playJump(true);
         }
 
+        const cdTick = Math.ceil(sim.countdown);
+        if (cdTick !== lastCountdownTick) {
+          if (cdTick > 0) soundEngine.playCountdown(false);
+          else if (lastCountdownTick > 0) soundEngine.playCountdown(true);
+          lastCountdownTick = cdTick;
+        }
         renderer.consumeEvents(sim.pendingEvents);
         renderer.updateParticles(dt);
         renderer.render(
@@ -1218,7 +1202,7 @@ export default function App() {
             }
 
             const snap = buildHudSnapshot(sim);
-            const sig = `${Math.ceil(snap.timeRemainingSec)}|${snap.aliveCount}|${snap.hazardPhase}|${snap.storyObjective ?? ''}|${snap.players
+            const sig = `${Math.ceil(snap.countdown)}|${Math.ceil(snap.timeRemainingSec)}|${snap.aliveCount}|${snap.hazardPhase}|${snap.storyObjective ?? ''}|${snap.players
               .map(
                 (p) =>
                   `${p.lives}:${p.score}:${p.kills}:${p.stomps}:${p.eliminated}:${p.abilityCooldown.toFixed(
