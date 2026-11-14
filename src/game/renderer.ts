@@ -3,6 +3,7 @@ import {
   ARENA_HEIGHT,
   ARENA_WIDTH,
   CHARACTER_COLORS,
+  PHYSICS,
 } from './constants';
 import {
   CharacterEntity,
@@ -1089,6 +1090,8 @@ export class CastleRenderer {
 
     ctx.translate(cx, bottomY);
     ctx.scale(scaleX, scaleY);
+    const sizeMul = char.w / PHYSICS.CHAR_WIDTH;
+    if (sizeMul > 1.05) ctx.scale(sizeMul, sizeMul);
 
     const bodyTilt =
       char.stunTimer > 0

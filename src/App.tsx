@@ -11,6 +11,17 @@ import {
   saveAchievements,
 } from './game/achievements';
 import { computeBotInput } from './game/ai';
+import {
+  ADVENTURE_CHAPTERS,
+  AdventureChapter,
+  AdventureProgress,
+  CutsceneLine,
+  buildAdventureAllySlots,
+  createAdventureState,
+  loadAdventureProgress,
+  saveAdventureProgress,
+} from './game/adventure';
+import { AdventureCutscene } from './components/AdventureCutscene';
 import { soundEngine } from './game/audio';
 import {
   computeLevelFromXp,
@@ -278,6 +289,9 @@ export default function App() {
   const [postVictoryChapterId, setPostVictoryChapterId] = useState<number | null>(
     null
   );
+  const activeAdventureRef = useRef<AdventureChapter | null>(null);
+  const [adventureProgress, setAdventureProgress] = useState<AdventureProgress>(() => loadAdventureProgress());
+  const [cutscene, setCutscene] = useState<{ title: string; lines: CutsceneLine[]; onDone: () => void } | null>(null);
   const activeStoryRef = useRef<{
     chapter: StoryChapterDef;
     bonusLives: number;
@@ -462,6 +476,19 @@ export default function App() {
       );
       grantAchievements(endUnlocked);
 
+      if (rawResult.adventureWon && rawResult.adventureChapterId) {
+        const advId = rawResult.adventureChapterId;
+        setAdventureProgress((prev) => {
+          const next = { completed: Array.from(new Set([...prev.completed, advId])) };
+          saveAdventureProgress(next);
+          return next;
+        });
+        const ch = ADVENTURE_CHAPTERS.find((c) => c.id === advId);
+        if (ch && !fromOnlineBroadcast) {
+          setCutscene({ title: ch.title, lines: ch.outro, onDone: () => setCutscene(null) });
+        }
+      }
+
       if (rawResult.storyWon && rawResult.storyChapterId) {
         recordStoryVictory(rawResult.storyChapterId);
       }
@@ -562,6 +589,7 @@ export default function App() {
     roundUnlockedRef.current.clear();
     guestInputsRef.current = {};
     activeStoryRef.current = null;
+    activeAdventureRef.current = null;
     activeSagaLevelRef.current = null;
     isOnlineMatchRef.current = true;
 
@@ -684,6 +712,19 @@ export default function App() {
         buildStorySlots(chapter),
         chapter.storyRule
       );
+    } else if (activeAdventureRef.current) {
+      const ch = activeAdventureRef.current;
+      const advSettings: GameSettings = {
+        ...settingsRef.current,
+        mode: 'adventure',
+        mapId: ch.mapId,
+        lives: ch.lives,
+        roundDurationSec: 0,
+        botsEnabled: true,
+      };
+      freshSim = createSimulation(advSettings, buildAdventureAllySlots(slotsRef.current, ch));
+      freshSim.adventure = createAdventureState(ch);
+      if (ch.hazard) freshSim.hazardPhase = ch.hazard;
     } else {
       freshSim = createSimulation(settingsRef.current, slotsRef.current);
     }
@@ -702,6 +743,7 @@ export default function App() {
       soundEngine.unlock();
       soundEngine.playMenuClick();
       activeStoryRef.current = null;
+    activeAdventureRef.current = null;
       activeSagaLevelRef.current = level;
       startLocalGame(true);
     },
@@ -731,12 +773,43 @@ export default function App() {
       soundEngine.unlock();
       soundEngine.playMenuClick();
       activeSagaLevelRef.current = null;
+      activeAdventureRef.current = null;
       activeStoryRef.current = { chapter, bonusLives };
       setPostVictoryChapterId(null);
       startLocalGame(true);
     },
     [startLocalGame]
   );
+
+  const handleStartAdventureChapter = useCallback(
+    (chapter: AdventureChapter) => {
+      soundEngine.unlock();
+      soundEngine.playMenuClick();
+      activeStoryRef.current = null;
+      activeSagaLevelRef.current = null;
+      activeAdventureRef.current = chapter;
+      setCutscene({
+        title: chapter.title,
+        lines: chapter.intro,
+        onDone: () => {
+          setCutscene(null);
+          startLocalGame(true);
+        },
+      });
+    },
+    [startLocalGame]
+  );
+
+  const handleContinueAdventure = useCallback(() => {
+    soundEngine.playMenuClick();
+    soundEngine.stopMusic();
+    activeAdventureRef.current = null;
+    setRoundResult(null);
+    setMenuSubView('adventure');
+    screenStateRef.current = 'title';
+    document.body.dataset.state = 'title';
+    setScreenState('title');
+  }, []);
 
   const handleSelectStoryChoice = useCallback(
     (chapter: StoryChapterDef, choice: StoryChoiceOption) => {
@@ -771,6 +844,7 @@ export default function App() {
     soundEngine.stopMusic();
     const wonChId = roundResult?.storyChapterId ?? null;
     activeStoryRef.current = null;
+    activeAdventureRef.current = null;
     activeSagaLevelRef.current = null;
     setRoundResult(null);
     setPostVictoryChapterId(wonChId);
@@ -786,6 +860,7 @@ export default function App() {
     inputHubRef.current?.clearAll();
     rendererRef.current?.resetParticles();
     activeStoryRef.current = null;
+    activeAdventureRef.current = null;
     activeSagaLevelRef.current = null;
     setRoundResult(null);
     setMenuSubView('saga');
@@ -825,6 +900,7 @@ export default function App() {
     inputHubRef.current?.clearAll();
     rendererRef.current?.resetParticles();
     activeStoryRef.current = null;
+    activeAdventureRef.current = null;
     activeSagaLevelRef.current = null;
     if (isOnlineMatchRef.current) {
       isOnlineMatchRef.current = false;
@@ -844,6 +920,7 @@ export default function App() {
     inputHubRef.current?.clearAll();
     rendererRef.current?.resetParticles();
     activeStoryRef.current = null;
+    activeAdventureRef.current = null;
     activeSagaLevelRef.current = null;
     if (isOnlineMatchRef.current) {
       isOnlineMatchRef.current = false;
@@ -961,6 +1038,7 @@ export default function App() {
         ) {
           e.preventDefault();
           activeStoryRef.current = null;
+    activeAdventureRef.current = null;
           startLocalGame(true);
         } else if (e.code === 'Escape' && menuSubViewRef.current !== 'home') {
           setMenuSubView('home');
@@ -1210,6 +1288,8 @@ export default function App() {
           settings={settings}
           slots={slots}
           storyProgress={storyProgress}
+          adventureProgress={adventureProgress}
+          onStartAdventureChapter={handleStartAdventureChapter}
           sagaProgress={sagaProgress}
           progression={progression}
           achievementState={achievementState}
@@ -1228,6 +1308,7 @@ export default function App() {
           onUpdateSlot={updateSlot}
           onStartGame={() => {
             activeStoryRef.current = null;
+    activeAdventureRef.current = null;
             activeSagaLevelRef.current = null;
             startLocalGame(true);
           }}
@@ -1328,7 +1409,11 @@ export default function App() {
           result={roundResult}
           isOnlineGuest={isOnlineGuest}
           onContinueStory={
-            roundResult.storyWon ? handleContinueStory : undefined
+            roundResult.storyWon
+              ? handleContinueStory
+              : roundResult.adventureWon
+              ? handleContinueAdventure
+              : undefined
           }
           onOpenSagaMap={
             roundResult.sagaLevelId ? handleOpenSagaMap : undefined
@@ -1342,6 +1427,17 @@ export default function App() {
           }}
           onMainMenu={returnToMainMenu}
           onQuit={handleQuitApp}
+        />
+      )}
+
+      {cutscene && (
+        <AdventureCutscene
+          key={cutscene.title + cutscene.lines[0]?.text}
+          title={cutscene.title}
+          lines={cutscene.lines}
+          heroName={slots[0]?.name || 'Kahraman'}
+          heroCostume={slots[0]?.costume ?? DEFAULT_SLOTS[0].costume}
+          onDone={cutscene.onDone}
         />
       )}
 

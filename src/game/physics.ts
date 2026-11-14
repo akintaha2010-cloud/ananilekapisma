@@ -1,3 +1,4 @@
+import { buildAdventureEnemySlot } from './adventure';
 import { getHeroDef } from './characters';
 import {
   ARENA_HEIGHT,
@@ -5,6 +6,7 @@ import {
   CHARACTER_COLORS,
   PHYSICS,
   CROWN_WIN_SEC,
+  DEFAULT_SETTINGS,
 } from './constants';
 import { createInitialPlatforms, getMapLayout } from './maps';
 import {
@@ -51,7 +53,8 @@ export function createSimulation(
       settings.mode === 'ffa' ||
       settings.mode === 'team' ||
       settings.mode === 'story' ||
-      settings.mode === 'saga'
+      settings.mode === 'saga' ||
+      settings.mode === 'adventure'
         ? settings.lives
         : 99;
     return {
@@ -333,7 +336,7 @@ function triggerHeroAbility(char: CharacterEntity, sim: SimulationState) {
   const color = CHARACTER_COLORS[char.costume.colorId].primary;
 
   const isSameTeam = (a: CharacterEntity, b: CharacterEntity) =>
-    (sim.mode === 'team' || sim.mode === 'story' || sim.mode === 'saga') &&
+    (sim.mode === 'team' || sim.mode === 'story' || sim.mode === 'saga' || sim.mode === 'adventure') &&
     a.team === b.team;
 
   switch (hero.abilityKind) {
@@ -751,7 +754,7 @@ function resolveCharacterCollisions(sim: SimulationState) {
       }
 
       const sameTeam =
-        (sim.mode === 'team' || sim.mode === 'story' || sim.mode === 'saga') &&
+        (sim.mode === 'team' || sim.mode === 'story' || sim.mode === 'saga' || sim.mode === 'adventure') &&
         a.team === b.team;
 
       const aCenterY = a.y + a.h / 2;
@@ -887,6 +890,15 @@ function applyHeadStomp(
   if (sim.mode === 'crown' && sim.crownHolder === victim.slotIndex) {
     sim.crownHolder = attacker.slotIndex;
   }
+  const adv = sim.adventure;
+  if (sim.mode === 'adventure' && adv && victim.team === 'B' && adv.hp[victim.slotIndex] !== undefined) {
+    adv.hp[victim.slotIndex] -= 1;
+    if (adv.hp[victim.slotIndex] <= 0 && victim.alive) {
+      victim.lastHitBy = attacker.slotIndex;
+      victim.lives = 1;
+      eliminateCharacter(victim, sim);
+    }
+  }
 
   sim.pendingEvents.push({
     type: 'stomp',
@@ -928,7 +940,8 @@ function eliminateCharacter(char: CharacterEntity, sim: SimulationState) {
     sim.mode === 'ffa' ||
     sim.mode === 'team' ||
     sim.mode === 'story' ||
-    sim.mode === 'saga'
+    sim.mode === 'saga' ||
+    sim.mode === 'adventure'
   ) {
     char.lives -= 1;
     if (char.lives <= 0) {
@@ -1019,6 +1032,24 @@ function evaluateWinCondition(sim: SimulationState) {
           ? 'Mavi Takım kaleyi fethetti!'
           : 'Takımlar aynı anda düştü!';
     }
+  } else if (sim.mode === 'adventure' && sim.adventure) {
+    const adv = sim.adventure;
+    const heroes = sim.players.filter((p) => p.team === 'A');
+    const foes = sim.players.filter((p) => p.team === 'B');
+    if (heroes.length > 0 && heroes.every((p) => p.eliminated)) {
+      sim.finished = true;
+      sim.winnerTeam = 'B';
+      sim.winnerSlot = foes.find((f) => !f.eliminated)?.slotIndex ?? foes[0]?.slotIndex ?? null;
+      sim.winReason = 'Kara Paşa\'nın ordusu bu sefer kazandı! Tekrar dene.';
+      return;
+    }
+    if (adv.waveIdx >= adv.waves.length && foes.length > 0 && foes.every((p) => p.eliminated)) {
+      sim.finished = true;
+      sim.winnerTeam = 'A';
+      const mvp = rankPlayers(heroes)[0] ?? heroes[0];
+      sim.winnerSlot = mvp ? mvp.slotIndex : null;
+      sim.winReason = adv.victoryText;
+    }
   } else if (sim.mode === 'crown') {
     const held = sim.crownHeld ?? {};
     const champ = sim.players.find((p) => (held[p.slotIndex] ?? 0) >= CROWN_WIN_SEC);
@@ -1101,7 +1132,55 @@ export function stepSimulation(
 
   resolveCharacterCollisions(sim);
   if (sim.mode === 'crown') updateCrown(sim, dt);
+  if (sim.mode === 'adventure') updateAdventure(sim, dt);
   evaluateWinCondition(sim);
+}
+
+const ADVENTURE_ENEMY_HP = { knight: 2, mage: 1, shadow: 2, boss: 8 } as const;
+
+export function spawnAdventureWave(sim: SimulationState) {
+  const adv = sim.adventure;
+  if (!adv || adv.waveIdx >= adv.waves.length) return;
+  const wave = adv.waves[adv.waveIdx++];
+  const slots = wave.map((kind) => buildAdventureEnemySlot(kind, adv.nextSlot++));
+  const temp = createSimulation(
+    { ...DEFAULT_SETTINGS, mode: 'adventure', mapId: sim.mapId, lives: 1, botsEnabled: true },
+    slots
+  );
+  temp.players.forEach((foe, i) => {
+    const kind = wave[i];
+    foe.y = -60 - i * 40;
+    foe.vy = 0;
+    foe.facing = foe.x > ARENA_WIDTH / 2 ? -1 : 1;
+    if (kind === 'boss') {
+      foe.w = Math.round(PHYSICS.CHAR_WIDTH * 1.5);
+      foe.h = Math.round(PHYSICS.CHAR_HEIGHT * 1.5);
+      foe.x = ARENA_WIDTH / 2 - foe.w / 2;
+      adv.bossSlot = foe.slotIndex;
+    }
+    adv.hp[foe.slotIndex] = ADVENTURE_ENEMY_HP[kind];
+    sim.players.push(foe);
+    sim.pendingEvents.push({
+      type: 'ability',
+      x: foe.x + foe.w / 2,
+      y: 60,
+      slotIndex: foe.slotIndex,
+      color: CHARACTER_COLORS[foe.costume.colorId].primary,
+    });
+  });
+  sim.trauma = Math.min(1, sim.trauma + (wave.includes('boss') ? 0.8 : 0.35));
+}
+
+function updateAdventure(sim: SimulationState, dt: number) {
+  const adv = sim.adventure;
+  if (!adv) return;
+  const foesLeft = sim.players.some((p) => p.team === 'B' && !p.eliminated);
+  if (foesLeft || adv.waveIdx >= adv.waves.length) return;
+  adv.waveDelay -= dt;
+  if (adv.waveDelay <= 0) {
+    adv.waveDelay = 1.4;
+    spawnAdventureWave(sim);
+  }
 }
 
 function resetCrown(sim: SimulationState) {
@@ -1148,6 +1227,11 @@ function updateCrown(sim: SimulationState, dt: number) {
   sim.crownY = holder.y - 14;
 }
 
+function isHudVisible(sim: SimulationState, p: CharacterEntity): boolean {
+  if (sim.mode !== 'adventure') return true;
+  return p.team === 'A' || p.slotIndex === sim.adventure?.bossSlot;
+}
+
 export function buildHudSnapshot(sim: SimulationState): HudSnapshot {
   let storyObjective = sim.storyRule?.objectiveLabel;
   if ((sim.mode === 'story' || sim.mode === 'saga') && sim.storyRule) {
@@ -1168,8 +1252,17 @@ export function buildHudSnapshot(sim: SimulationState): HudSnapshot {
     timeRemainingSec: sim.timeRemainingSec,
     aliveCount: sim.players.filter((p) => !p.eliminated).length,
     hazardPhase: sim.hazardPhase,
-    storyObjective,
-    players: sim.players.map((p) => ({
+    storyObjective:
+      sim.mode === 'adventure' && sim.adventure
+        ? `Dalga ${Math.max(1, sim.adventure.waveIdx)}/${sim.adventure.waves.length} · Kalan düşman: ${
+            sim.players.filter((p) => p.team === 'B' && !p.eliminated).length
+          }${
+            sim.adventure.bossSlot !== null && (sim.adventure.hp[sim.adventure.bossSlot] ?? 0) > 0
+              ? ` · Kara Paşa: ${sim.adventure.hp[sim.adventure.bossSlot]}/8`
+              : ''
+          }`
+        : storyObjective,
+    players: sim.players.filter((p) => isHudVisible(sim, p)).map((p) => ({
       slotIndex: p.slotIndex,
       heroId: p.heroId,
       name: p.name,
@@ -1218,7 +1311,7 @@ export function buildRoundResult(sim: SimulationState): RoundResult {
       (ranked[0]
         ? `${ranked[0].name} ${ranked[0].score} puan ile zirvede!`
         : 'Mücadele tamamlandı!'),
-    standings: ranked.map((p) => ({
+    standings: ranked.filter((p) => isHudVisible(sim, p)).map((p) => ({
       slotIndex: p.slotIndex,
       heroId: p.heroId,
       name: p.name,
@@ -1247,5 +1340,7 @@ export function buildRoundResult(sim: SimulationState): RoundResult {
         ? sim.storyRule.chapterId - 100
         : undefined,
     sagaWon,
+    adventureChapterId: sim.mode === 'adventure' ? sim.adventure?.chapterId : undefined,
+    adventureWon: sim.mode === 'adventure' && sim.finished && sim.winnerTeam === 'A',
   };
 }

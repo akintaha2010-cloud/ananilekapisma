@@ -402,3 +402,36 @@ test('crown mode: touching crown grabs it, stomping holder steals it, bots finis
   assert.ok(held > 5, `crown should be carried for a while, got ${held}`);
   buildRoundResult(sim);
 });
+
+test('adventure mode: enemy waves drop in one after another and the chapter resolves', async () => {
+  const { ADVENTURE_CHAPTERS, buildAdventureAllySlots, createAdventureState } = await import('./adventure');
+  for (const chapter of ADVENTURE_CHAPTERS) {
+    const settings: GameSettings = { ...DEFAULT_SETTINGS, mode: 'adventure', mapId: chapter.mapId, lives: chapter.lives, botsEnabled: true };
+    const allies = buildAdventureAllySlots(
+      DEFAULT_SLOTS.map((s) => ({ ...s, kind: 'bot', aiPersonality: 'aggressive' })),
+      chapter
+    );
+    const sim = createSimulation(settings, allies);
+    sim.adventure = createAdventureState(chapter);
+    let steps = 0;
+    while (!sim.finished && steps < 60 * 240) {
+      const inputs: Record<number, PlayerInputState> = {};
+      for (const p of sim.players) inputs[p.slotIndex] = computeBotInput(p, sim, 1 / 60);
+      stepSimulation(sim, inputs, 1 / 60);
+      steps++;
+    }
+    const foes = sim.players.filter((p) => p.team === 'B');
+    assert.ok(foes.length >= chapter.waves[0].length, `chapter ${chapter.id} should spawn enemies`);
+    assert.equal(sim.finished, true, `chapter ${chapter.id} should finish`);
+    const result = buildRoundResult(sim);
+    assert.equal(result.adventureChapterId, chapter.id);
+    if (result.adventureWon) {
+      assert.equal(sim.adventure.waveIdx, chapter.waves.length);
+      assert.ok(foes.every((f) => f.eliminated));
+    }
+    if (chapter.waves.some((w) => w.includes('boss')) && sim.adventure.bossSlot !== null) {
+      const boss = sim.players.find((p) => p.slotIndex === sim.adventure!.bossSlot)!;
+      assert.ok(boss.w > 40);
+    }
+  }
+});

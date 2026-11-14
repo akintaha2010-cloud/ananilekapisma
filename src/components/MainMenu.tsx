@@ -1,3 +1,5 @@
+import { ADVENTURE_CHAPTERS, AdventureChapter, AdventureProgress } from '../game/adventure';
+import { AdventureModal } from './AdventureModal';
 import React, { useState } from 'react';
 import {
   Compass,
@@ -47,6 +49,8 @@ interface MainMenuProps {
   settings: GameSettings;
   slots: PlayerSlotConfig[];
   storyProgress: StoryProgress;
+  adventureProgress: AdventureProgress;
+  onStartAdventureChapter: (chapter: AdventureChapter) => void;
   sagaProgress: SagaProgress;
   progression: PlayerProgression;
   achievementState: AchievementState;
@@ -86,6 +90,8 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   settings,
   slots,
   storyProgress,
+  adventureProgress,
+  onStartAdventureChapter,
   sagaProgress,
   progression,
   achievementState,
@@ -267,6 +273,16 @@ export const MainMenu: React.FC<MainMenuProps> = ({
               </button>
             </div>
 
+            <button
+              type="button"
+              onClick={() => onSetSubView('adventure')}
+              data-testid="menu-adventure-btn"
+              className="w-full mt-2.5 py-3.5 px-4 rounded-none bg-rose-700 hover:bg-rose-600 border-2 border-rose-200 text-white font-display font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer pixel-btn"
+            >
+              <Swords className="w-5 h-5 shrink-0" />
+              MACERA: KARA PAŞA ({adventureProgress.completed.length}/{ADVENTURE_CHAPTERS.length})
+            </button>
+
             {/* Secondary Mode Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-2.5">
               <button
@@ -395,6 +411,14 @@ export const MainMenu: React.FC<MainMenuProps> = ({
             onBack={() => onSetSubView('home')}
             onQuit={handleRequestQuit}
             onPlay={onStartGame}
+          />
+        )}
+
+        {subView === 'adventure' && (
+          <AdventureModal
+            progress={adventureProgress}
+            onStartChapter={onStartAdventureChapter}
+            onBack={() => onSetSubView('home')}
           />
         )}
 

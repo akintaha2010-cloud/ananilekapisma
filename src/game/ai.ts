@@ -218,7 +218,7 @@ export function computeBotInput(
 
   // 3. Pick smartest enemy target
   const isTeamMode =
-    sim.mode === 'team' || sim.mode === 'story' || sim.mode === 'saga';
+    sim.mode === 'team' || sim.mode === 'story' || sim.mode === 'saga' || sim.mode === 'adventure';
   const enemies = sim.players.filter(
     (p) =>
       p.slotIndex !== bot.slotIndex &&

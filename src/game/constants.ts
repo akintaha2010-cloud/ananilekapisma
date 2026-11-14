@@ -173,7 +173,7 @@ export const AI_PERSONALITIES: {
 ];
 
 export interface GameModeMeta {
-  id: Exclude<GameModeId, 'story' | 'saga'>;
+  id: Exclude<GameModeId, 'story' | 'saga' | 'adventure'>;
   title: string;
   subtitle: string;
   description: string;

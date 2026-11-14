@@ -9,9 +9,10 @@ export type MenuSubView =
   | 'online'
   | 'story'
   | 'saga'
+  | 'adventure'
   | 'achievements';
 
-export type GameModeId = 'ffa' | 'team' | 'time' | 'chaos' | 'crown' | 'story' | 'saga';
+export type GameModeId = 'ffa' | 'team' | 'time' | 'chaos' | 'crown' | 'story' | 'saga' | 'adventure';
 
 export type MapId =
   | 'classic'
@@ -265,6 +266,19 @@ export interface GameEvent {
   points?: number;
 }
 
+export type AdventureEnemyKind = 'knight' | 'mage' | 'shadow' | 'boss';
+
+export interface AdventureState {
+  chapterId: number;
+  waves: AdventureEnemyKind[][];
+  waveIdx: number;
+  waveDelay: number;
+  bossSlot: number | null;
+  nextSlot: number;
+  victoryText: string;
+  hp: Record<number, number>;
+}
+
 export interface StoryMatchRule {
   chapterId: number;
   title: string;
@@ -301,6 +315,7 @@ export interface SimulationState {
   crownX?: number;
   crownY?: number;
   crownHeld?: Record<number, number>;
+  adventure?: AdventureState | null;
 }
 
 export interface HudPlayerSummary {
@@ -371,6 +386,8 @@ export interface RoundResult {
   storyWon?: boolean;
   sagaLevelId?: number;
   sagaWon?: boolean;
+  adventureChapterId?: number;
+  adventureWon?: boolean;
   sagaStars?: 0 | 1 | 2 | 3;
   xpEarned?: number;
   leveledUpTo?: number;

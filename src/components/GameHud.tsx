@@ -69,7 +69,8 @@ export const GameHud: React.FC<GameHudProps> = ({
     hud.mode === 'ffa' ||
     hud.mode === 'team' ||
     hud.mode === 'story' ||
-    hud.mode === 'saga';
+    hud.mode === 'saga' ||
+    hud.mode === 'adventure';
 
   return (
     <div className="fixed inset-0 z-10 pointer-events-none flex flex-col justify-between p-2.5 md:p-4">
