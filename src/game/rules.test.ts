@@ -435,3 +435,16 @@ test('adventure mode: enemy waves drop in one after another and the chapter reso
     }
   }
 });
+
+test('jokes and Hack Club secret codes', async () => {
+  const { MENU_TIPS, pickQuip, matchSecret, normalizeSecretKey, SECRETS } = await import('./jokes');
+  assert.ok(MENU_TIPS.length > 5);
+  assert.equal(pickQuip(MENU_TIPS, MENU_TIPS.length + 2), MENU_TIPS[2]);
+  assert.equal(pickQuip([], 3), '');
+  const typed = 'xxhaven'.split('').map(normalizeSecretKey);
+  assert.equal(matchSecret(typed)?.id, 'haven');
+  assert.equal(matchSecret(['Ç', 'a', 'Y'].map(normalizeSecretKey))?.id, 'cay');
+  const konami = SECRETS.find((s) => s.id === 'konami')!;
+  assert.equal(matchSecret(['q', ...konami.sequence])?.id, 'konami');
+  assert.equal(matchSecret(['h', 'a', 'v']), null);
+});

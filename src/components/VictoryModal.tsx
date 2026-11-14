@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { DEFEAT_QUIPS, pickQuip, VICTORY_QUIPS } from '../game/jokes';
 import {
   Award,
   Compass,
@@ -35,6 +36,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   onOpenSagaMap,
   isOnlineGuest = false,
 }) => {
+  const [quipSeed] = useState(() => Math.floor(Math.random() * 1000));
   const winner =
     result.standings.find((p) => p.slotIndex === result.winnerSlot) ??
     result.standings[0];
@@ -77,6 +79,9 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               : 'Berabere!'}
           </h2>
           <p className="text-sm text-slate-300 mt-1">{result.winReason}</p>
+          <p className="text-xs text-amber-200/90 italic mt-1" data-testid="victory-quip">
+            "{pickQuip(result.winnerTeam === 'B' ? DEFEAT_QUIPS : VICTORY_QUIPS, quipSeed)}"
+          </p>
 
           {/* Saga Stars Display */}
           {result.sagaLevelId !== undefined && (
