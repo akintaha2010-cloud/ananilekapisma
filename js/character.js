@@ -7,6 +7,27 @@ export const COLORS = [
   { name: 'Limon', h: 52, s: 85 },
   { name: 'Turkuaz', h: 172, s: 60 },
   { name: 'Kar', h: 220, s: 10 },
+  { name: 'Kızıl', h: 2, s: 78 },
+  { name: 'Altın', h: 44, s: 95 },
+  { name: 'Gece', h: 232, s: 45 },
+  { name: 'Zümrüt', h: 150, s: 70 },
+];
+
+export const HATS = [
+  { id: 'fes', name: 'Fes' },
+  { id: 'migfer', name: 'Miğfer' },
+  { id: 'sarik', name: 'Sarık' },
+  { id: 'tac', name: 'Taç' },
+  { id: 'bork', name: 'Yeniçeri Börkü' },
+  { id: 'yok', name: 'Kel' },
+];
+
+export const STACHES = [
+  { id: 'klasik', name: 'Klasik' },
+  { id: 'ince', name: 'İnce' },
+  { id: 'gur', name: 'Gür' },
+  { id: 'pala', name: 'Pala' },
+  { id: 'yok', name: 'Yok' },
 ];
 
 export function palette(c) {
@@ -79,18 +100,31 @@ export function drawFez(ctx, x, y, rot, scale = 1, tassel = 0) {
   ctx.restore();
 }
 
-function drawMustache(ctx, y, wiggle) {
+function stachePath(ctx, s, y, wiggle, k) {
+  ctx.moveTo(0, y - 2);
+  ctx.bezierCurveTo(s * 5, y - 8 * k.t, s * 15 * k.l, y - 7 * k.t, s * 20 * k.l, y - 1 + wiggle * 0.5);
+  ctx.bezierCurveTo(s * 23 * k.l, y + 2, s * 27 * k.l, y - 1 - k.c, s * 27.5 * k.l, y - 6 * k.t - k.c + wiggle);
+  ctx.bezierCurveTo(s * 29 * k.l, y + 1, s * 24 * k.l, y + 6 * k.t, s * 17 * k.l, y + 5 * k.t);
+  ctx.bezierCurveTo(s * 10, y + 5 * k.t, s * 4, y + 3 * k.t, 0, y + 2 * k.t);
+  ctx.closePath();
+}
+
+const STACHE_SHAPE = {
+  klasik: { l: 1, t: 1, c: 0 },
+  ince: { l: 1.05, t: 0.45, c: 4 },
+  gur: { l: 0.95, t: 1.75, c: -2 },
+  pala: { l: 1.35, t: 1.15, c: 7 },
+};
+
+export function drawMustache(ctx, y, wiggle, style = 'klasik') {
+  const k = STACHE_SHAPE[style];
+  if (!k) return;
   ctx.fillStyle = '#1e1e22';
   ctx.strokeStyle = '#0c0c0e';
   ctx.lineWidth = 1.2;
   for (const s of [-1, 1]) {
     ctx.beginPath();
-    ctx.moveTo(0, y - 2);
-    ctx.bezierCurveTo(s * 5, y - 8, s * 15, y - 7, s * 20, y - 1 + wiggle * 0.5);
-    ctx.bezierCurveTo(s * 23, y + 2, s * 27, y - 1, s * 27.5, y - 6 + wiggle);
-    ctx.bezierCurveTo(s * 29, y + 1, s * 24, y + 6, s * 17, y + 5);
-    ctx.bezierCurveTo(s * 10, y + 5, s * 4, y + 3, 0, y + 2);
-    ctx.closePath();
+    stachePath(ctx, s, y, wiggle, k);
     ctx.fill();
     ctx.stroke();
   }
@@ -99,9 +133,124 @@ function drawMustache(ctx, y, wiggle) {
   for (const s of [-1, 1]) {
     ctx.beginPath();
     ctx.moveTo(s * 4, y - 2);
-    ctx.quadraticCurveTo(s * 12, y - 5, s * 19, y);
+    ctx.quadraticCurveTo(s * 12 * k.l, y - 5 * k.t, s * 19 * k.l, y);
     ctx.stroke();
   }
+}
+
+function drawHelmet(ctx) {
+  const g = ctx.createLinearGradient(-16, 0, 16, 0);
+  g.addColorStop(0, '#6d7480');
+  g.addColorStop(0.45, '#dfe5ec');
+  g.addColorStop(1, '#7b828e');
+  ctx.fillStyle = g;
+  ctx.strokeStyle = '#2a2e36';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-16, 2);
+  ctx.bezierCurveTo(-17, -20, -6, -27, 0, -36);
+  ctx.bezierCurveTo(6, -27, 17, -20, 16, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#b08a2e';
+  ctx.fillRect(-16, -2, 32, 5);
+  ctx.strokeRect(-16, -2, 32, 5);
+  ctx.fillStyle = '#9aa1ab';
+  ctx.fillRect(-1.5, 1, 3, 12);
+  ctx.strokeRect(-1.5, 1, 3, 12);
+}
+
+function drawTurban(ctx) {
+  ctx.strokeStyle = '#8a7c5c';
+  ctx.lineWidth = 1.5;
+  ctx.fillStyle = '#f3ecd8';
+  ctx.beginPath();
+  ctx.ellipse(0, -12, 20, 15, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(138,124,92,0.75)';
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.ellipse(0, -12, 20 - i * 1.5, 15 - i * 3, -0.35 + i * 0.25, Math.PI * 0.05, Math.PI * 0.95);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#2f8f5b';
+  ctx.beginPath();
+  ctx.ellipse(0, -14, 4, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#e94b4b';
+  ctx.beginPath();
+  ctx.moveTo(0, -18);
+  ctx.quadraticCurveTo(7, -32, 3, -40);
+  ctx.quadraticCurveTo(-1, -30, 0, -18);
+  ctx.fill();
+}
+
+function drawCrown(ctx) {
+  const g = ctx.createLinearGradient(0, -26, 0, 2);
+  g.addColorStop(0, '#fff2a8');
+  g.addColorStop(1, '#d19a1c');
+  ctx.fillStyle = g;
+  ctx.strokeStyle = '#7a4d08';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-15, 2);
+  ctx.lineTo(-17, -20);
+  ctx.lineTo(-8, -10);
+  ctx.lineTo(0, -26);
+  ctx.lineTo(8, -10);
+  ctx.lineTo(17, -20);
+  ctx.lineTo(15, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  for (const [x, c] of [[-8, '#3fb6ff'], [0, '#ff4060'], [8, '#3fd07a']]) {
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.arc(x, -4, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawBork(ctx, tassel) {
+  ctx.fillStyle = '#f4f1ea';
+  ctx.strokeStyle = '#6e6655';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-14, 2);
+  ctx.lineTo(-11, -30);
+  ctx.quadraticCurveTo(0, -36, 11, -30);
+  ctx.lineTo(14, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(10, -30);
+  ctx.bezierCurveTo(26 + tassel * 4, -34, 30 + tassel * 6, -10, 22 + tassel * 4, 10);
+  ctx.lineTo(15, 8);
+  ctx.bezierCurveTo(22, -8, 20, -22, 8, -26);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#c9a23a';
+  ctx.fillRect(-15, -3, 30, 6);
+  ctx.strokeRect(-15, -3, 30, 6);
+  ctx.fillStyle = '#b8402c';
+  ctx.fillRect(-3, -24, 6, 18);
+}
+
+export function drawHat(ctx, kind, x, y, rot, scale = 1, tassel = 0) {
+  if (kind === 'yok') return;
+  if (!kind || kind === 'fes') return drawFez(ctx, x, y, rot, scale, tassel);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.scale(scale, scale);
+  if (kind === 'migfer') drawHelmet(ctx);
+  else if (kind === 'sarik') drawTurban(ctx);
+  else if (kind === 'tac') drawCrown(ctx);
+  else if (kind === 'bork') drawBork(ctx, tassel);
+  ctx.restore();
 }
 
 /**
@@ -243,10 +392,10 @@ export function drawCharacter(ctx, x, y, opts) {
     }
   }
 
-  drawMustache(ctx, -32 + 0, Math.sin(t * 5) * 0.8 + (opts.mustacheWiggle || 0));
+  drawMustache(ctx, -32, Math.sin(t * 5) * 0.8 + (opts.mustacheWiggle || 0), opts.stache);
 
   if (opts.fez !== false) {
-    drawFez(ctx, look * 0.4, -58, -0.08 * facing + (opts.fezTilt || 0), 1, Math.sin(t * 4) * 0.5 - facing * 0.3);
+    drawHat(ctx, opts.hat, look * 0.4, -58, -0.08 * facing + (opts.fezTilt || 0), 1, Math.sin(t * 4) * 0.5 - facing * 0.3);
   }
 
   ctx.restore();
