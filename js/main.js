@@ -16,6 +16,12 @@ const STEP = 1 / 120;
 const $ = (s) => document.querySelector(s);
 const canvas = $('#game');
 const ctx = canvas.getContext('2d');
+/* Dünya yarım çözünürlükte çizilip keskin büyütülür: tutarlı pixel art görünümü. */
+const PIX = 0.5;
+const pix = document.createElement('canvas');
+pix.width = WORLD.w * PIX;
+pix.height = WORLD.h * PIX;
+const pctx = pix.getContext('2d');
 const stage = $('#stage');
 
 const kb = createKeyboard();
@@ -375,40 +381,45 @@ function clientStep(dt) {
 
 function render() {
   if (!g) return;
-  ctx.save();
+  const wctx = pctx;
+  wctx.setTransform(PIX, 0, 0, PIX, 0, 0);
+  wctx.save();
   const cam = g.cam || 0;
-  if (run.shake > 0) ctx.translate(Math.sin(time * 61) * run.shake * 0.6, Math.cos(time * 47) * run.shake * 0.6);
+  if (run.shake > 0) wctx.translate(Math.sin(time * 61) * run.shake * 0.6, Math.cos(time * 47) * run.shake * 0.6);
   if (run.zoom > 0) {
     const zx = Math.max(0, Math.min(WORLD.w, run.zx - cam));
     const zy = Math.max(0, Math.min(WORLD.h, run.zy));
-    ctx.translate(zx, zy);
-    ctx.scale(1 + run.zoom, 1 + run.zoom);
-    ctx.translate(-zx, -zy);
+    wctx.translate(zx, zy);
+    wctx.scale(1 + run.zoom, 1 + run.zoom);
+    wctx.translate(-zx, -zy);
   }
   if (g.solids) {
-    ctx.drawImage(g.bg, 0, 0, WORLD.w, WORLD.h);
-    R.drawParallax(ctx, g.level, cam);
-    ctx.save();
-    ctx.translate(-cam, 0);
-    ctx.drawImage(g.solids, 0, 0);
+    wctx.drawImage(g.bg, 0, 0, WORLD.w, WORLD.h);
+    R.drawParallax(wctx, g.level, cam);
+    wctx.save();
+    wctx.translate(-cam, 0);
+    wctx.drawImage(g.solids, 0, 0);
   } else {
-    ctx.drawImage(g.bg, 0, 0, WORLD.w, WORLD.h);
-    ctx.save();
+    wctx.drawImage(g.bg, 0, 0, WORLD.w, WORLD.h);
+    wctx.save();
   }
-  R.drawTorches(ctx, time, g.level);
-  R.drawModeWorld(ctx, g, time, 'back');
-  for (const pl of g.level.platforms) R.drawPlatform(ctx, pl, time);
+  R.drawTorches(wctx, time, g.level);
+  R.drawModeWorld(wctx, g, time, 'back');
+  for (const pl of g.level.platforms) R.drawPlatform(wctx, pl, time);
   const order = [...g.players].sort((a, b) => (b.state === 'squashed') - (a.state === 'squashed'));
-  for (const p of order) R.drawPlayer(ctx, p, p.info, time);
-  R.drawModeWorld(ctx, g, time, 'front');
-  R.drawParticles(ctx, run.parts);
-  FX.drawFx(ctx, run.fx);
-  R.drawWater(ctx, time, g.level);
-  FX.drawLighting(ctx, g, run.fx, cam, time);
-  ctx.restore();
-  R.drawWeather(ctx, g.level, time);
-  ctx.restore();
-  FX.drawVignette(ctx);
+  for (const p of order) R.drawPlayer(wctx, p, p.info, time);
+  R.drawModeWorld(wctx, g, time, 'front');
+  R.drawParticles(wctx, run.parts);
+  FX.drawFx(wctx, run.fx);
+  R.drawWater(wctx, time, g.level);
+  FX.drawLighting(wctx, g, run.fx, cam, time);
+  wctx.restore();
+  R.drawWeather(wctx, g.level, time);
+  wctx.restore();
+  FX.drawVignette(wctx);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(pix, 0, 0, WORLD.w, WORLD.h);
+  ctx.imageSmoothingEnabled = true;
   if (run.demo) return;
   R.drawHUD(ctx, g);
   const goWord = { kusatma: 'SAVUN!', saldiri: 'SALDIR!', tac: 'TACI KAP!' }[g.mode.id] || 'KAPIŞ!';
