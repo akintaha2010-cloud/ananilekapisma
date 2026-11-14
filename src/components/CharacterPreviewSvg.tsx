@@ -1,3 +1,4 @@
+import { MASCOT_EARS, MASCOT_QUILLS } from '../game/mascot';
 import React from 'react';
 import { CHARACTER_COLORS } from '../game/constants';
 import { CostumeConfig } from '../game/types';
@@ -48,7 +49,7 @@ export const CharacterPreviewSvg: React.FC<CharacterPreviewSvgProps> = ({
     <svg
       width={size}
       height={size}
-      viewBox="-18 -46 36 50"
+      viewBox="-21 -46 42 50"
       shapeRendering="crispEdges"
       className={className}
       aria-hidden="true"
@@ -99,6 +100,18 @@ export const CharacterPreviewSvg: React.FC<CharacterPreviewSvgProps> = ({
         <rect x="9" y="-12" width="3" height="3" fill={theme.primary} />
 
         {/* Outer dark outline for Pou squircle */}
+        {MASCOT_QUILLS.map((q, i) => (
+          <rect key={`qo${i}`} x={q.x - 1} y={q.y - 1} width={q.s + 2} height={q.s + 2} fill="#140A10" />
+        ))}
+        {MASCOT_QUILLS.map((q, i) => (
+          <rect key={`qf${i}`} x={q.x} y={q.y} width={q.s} height={q.s} fill={theme.dark} />
+        ))}
+        {MASCOT_EARS.map((e, i) => (
+          <g key={`ear${i}`}>
+            <rect x={e.x - 1} y={e.y - 1} width={e.s + 2} height={e.s + 2} fill={theme.dark} />
+            <rect x={e.x} y={e.y} width={e.s} height={e.s} fill={theme.light} />
+          </g>
+        ))}
         <rect x="-4" y="-27" width="8" height="1" fill={theme.dark} />
         {BODY_ROWS.map(([y, hw]) => (
           <rect

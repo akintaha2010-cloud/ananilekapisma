@@ -1,3 +1,4 @@
+import { MASCOT_EARS, MASCOT_QUILLS } from './mascot';
 import {
   ARENA_HEIGHT,
   ARENA_WIDTH,
@@ -1183,6 +1184,20 @@ export class CastleRenderer {
     ctx.fillRect(9 + limbSpread, armY - 1, armW + 1, isPancaked ? 4 : 5);
     ctx.fillStyle = primary;
     ctx.fillRect(9 + limbSpread, armY, armW, isPancaked ? 2 : 3);
+
+    // 2b. Kirpi mane + ears (our original mascot silhouette)
+    if (!isPancaked) {
+      ctx.fillStyle = flash ? '#FFFFFF' : '#140A10';
+      for (const q of MASCOT_QUILLS) ctx.fillRect(q.x - 1, q.y - 1, q.s + 2, q.s + 2);
+      ctx.fillStyle = flash ? '#FFFFFF' : theme.dark;
+      for (const q of MASCOT_QUILLS) ctx.fillRect(q.x, q.y, q.s, q.s);
+      ctx.fillStyle = shade;
+      for (const q of MASCOT_QUILLS) if (q.s <= 3) ctx.fillRect(q.x, q.y, 1, 1);
+      ctx.fillStyle = outline;
+      for (const e of MASCOT_EARS) ctx.fillRect(e.x - 1, e.y - 1, e.s + 2, e.s + 2);
+      ctx.fillStyle = light;
+      for (const e of MASCOT_EARS) ctx.fillRect(e.x, e.y, e.s, e.s);
+    }
 
     // 3. Unified Pou-style doughy squircle pixel body (20px wide, 24px tall: y = -26..-2)
     // Silhouette rows: [y, halfWidth]
