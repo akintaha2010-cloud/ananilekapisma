@@ -536,6 +536,22 @@ export function drawParticles(ctx, parts) {
       ctx.strokeText(q.text, 0, 0);
       ctx.fillStyle = q.color;
       ctx.fillText(q.text, 0, 0);
+    } else if (q.kind === 'spark') {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = q.color;
+      ctx.lineWidth = q.size * k + 0.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-q.vx * 0.035, -q.vy * 0.035);
+      ctx.stroke();
+    } else if (q.kind === 'debris') {
+      ctx.rotate(q.rot);
+      ctx.fillStyle = q.color;
+      ctx.strokeStyle = '#1b1030';
+      ctx.lineWidth = 2;
+      ctx.fillRect(-q.size / 2, -q.size / 2, q.size, q.size);
+      ctx.strokeRect(-q.size / 2, -q.size / 2, q.size, q.size);
     } else if (q.kind === 'confetti') {
       ctx.rotate(q.rot);
       ctx.fillStyle = q.color;

@@ -9,6 +9,7 @@ import { createCutscene, updateCutscene, advanceCutscene, drawCutscene } from '.
 import { CHAPTERS, won, ITEM_LIST, loadSave, storeSave, buy, equip, owns, price, chapterUnlocked, totalStars, reward } from './progress.js';
 import { hostRoom, joinRoom, snapshot, applySnapshot, createNetInput, normalizeCode, MAX_PLAYERS } from './online.js';
 import * as R from './render.js';
+import * as FX from './fx.js';
 import { initAudio, sfx, setMuted, isMuted, startMusic } from './audio.js';
 
 const STEP = 1 / 120;
@@ -100,7 +101,7 @@ function begin(cfg, opts = {}) {
     g.solids = R.createSolids(lv);
   } else g.bg = R.createBackground(lv);
   g.players.forEach(dress);
-  run = { cfg, demo: !!opts.demo, chapter: opts.chapter ?? -1, parts: R.createParticles(), shake: 0, freeze: 0, goT: 0, shown: false, net: opts.net || null };
+  run = { cfg, demo: !!opts.demo, chapter: opts.chapter ?? -1, parts: R.createParticles(), fx: FX.createFx(), zoom: 0, zx: 0, zy: 0, slow: 0, shake: 0, freeze: 0, goT: 0, shown: false, net: opts.net || null };
   const local = g.players.some((p) => p.info.touch && p.info.control === 'human');
   $('#touch').classList.toggle('hidden', !(isTouch && !run.demo && (local || opts.net === 'client')));
 }
@@ -121,6 +122,14 @@ function humanInput(info) {
 
 function say(text, x, y, color = '#ffe14d', size = 30) {
   run.parts.push({ kind: 'text', text, x, y, vx: 0, vy: -70, g: 0, life: 0.9, max: 0.9, size, color, rot: 0, vr: 0 });
+}
+
+function punch(x, y, z) {
+  if (run.zoom < z) {
+    run.zoom = z;
+    run.zx = x;
+    run.zy = y;
+  }
 }
 
 function banner(text, color = '#ffd27a') {
@@ -167,6 +176,8 @@ function handleEvents(events) {
         play('poundland');
         run.shake = Math.max(run.shake, 9);
         p.anim.sy = 0.6;
+        FX.shockwave(run.fx, parts, cx, feet, P.shockRadius * Math.sqrt(p.scale || 1), info.pal.ui);
+        punch(cx, feet - 30, 0.035);
         R.spawn(parts, 'dust', cx, feet, 18, { angle: -Math.PI / 2, spread: 3.2, speed: 260, color: 'rgba(230,220,240,0.75)', g: 100, life: 0.5, size: 7 });
         parts.push({ kind: 'ring', x: cx, y: feet, vx: 0, vy: 0, g: 0, life: 0.4, max: 0.4, size: P.shockRadius * Math.sqrt(p.scale || 1), color: '#fff', rot: 0, vr: 0 });
         break;
@@ -178,6 +189,8 @@ function handleEvents(events) {
         const v = e.victim;
         play('stomp');
         v.anim.flash = 0.14;
+        FX.impact(run.fx, parts, centerX(v), v.y + 10, info.pal.ui, e.pound ? 1.5 : 1.15);
+        punch(centerX(v), v.y, e.pound ? 0.07 : 0.05);
         run.shake = Math.max(run.shake, e.pound ? 14 : 9);
         run.freeze = run.net === 'client' ? 0 : 0.07;
         p.anim.sy = 0.7;
@@ -197,6 +210,8 @@ function handleEvents(events) {
       case 'clash':
         play('shoved');
         if (e.victim) e.victim.anim.flash = 0.12;
+        FX.impact(run.fx, parts, (cx + centerX(e.victim)) / 2, p.y + 25, e.type === 'clash' ? '#ffffff' : info.pal.ui, e.type === 'clash' ? 0.6 : 0.85);
+        punch((cx + centerX(e.victim)) / 2, p.y + 25, 0.025);
         run.shake = Math.max(run.shake, 6);
         R.spawn(parts, 'star', (cx + centerX(e.victim)) / 2, p.y + 25, 5, { speed: 260, color: '#ffffff', life: 0.4, size: 6, g: 300 });
         if (e.type === 'shoved') say('HOP!', centerX(e.victim), e.victim.y - 14, info.pal.ui, 26);
@@ -212,6 +227,8 @@ function handleEvents(events) {
         break;
       case 'out':
         play('out');
+        FX.impact(run.fx, parts, cx, p.y + p.h / 2, '#ff8fa3', 1.3);
+        if (p.info.kind === 'boss' || (p.info.kind === 'hero' && !run.net)) run.slow = 0.45;
         R.spawn(parts, 'ghost', cx, feet, 1, { angle: -Math.PI / 2, spread: 0, speed: 90, g: -40, life: 2 });
         if (p.info.kind !== 'minion') say(p.info.kind === 'boss' ? 'PAŞA DÜŞTÜ!' : 'ELENDİ', cx, p.y - 20, '#ff8fa3', 28);
         break;
@@ -232,6 +249,7 @@ function handleEvents(events) {
         break;
       case 'rockland':
         play('poundland');
+        FX.shockwave(run.fx, parts, e.x, e.y, 120, '#ffb36b');
         run.shake = Math.max(run.shake, 8);
         R.spawn(parts, 'dust', e.x, e.y, 14, { angle: -Math.PI / 2, spread: 3, speed: 260, color: 'rgba(200,190,180,0.8)', g: 300, life: 0.6, size: 7 });
         break;
@@ -242,6 +260,7 @@ function handleEvents(events) {
       case 'crushed':
         play('stomp');
         run.shake = Math.max(run.shake, 12);
+        FX.impact(run.fx, parts, cx, p.y + 10, '#ffb36b', 1.4);
         say('TAŞ!', cx, p.y - 30, '#ffb07a', 34);
         R.spawn(parts, 'star', cx, p.y + 10, 8, { angle: -Math.PI / 2, spread: 3, speed: 340, color: '#ffe14d', life: 0.7, size: 8 });
         break;
@@ -258,6 +277,7 @@ function handleEvents(events) {
         play('start');
         break;
       case 'checkpoint':
+        FX.glow(run.fx, e.x, 520, 320, '#9dff7a', 0.8);
         say('KONTROL NOKTASI', e.x, 470, '#9dff7a', 26);
         play('doublejump');
         break;
@@ -298,6 +318,8 @@ function animate(dt) {
       g.cam += (target - g.cam) * Math.min(1, dt * 5);
     }
   }
+  FX.updateFx(run.fx, dt);
+  run.zoom = Math.max(0, run.zoom - dt * 0.25);
   run.shake = Math.max(0, run.shake - dt * 40);
   run.goT = Math.max(0, run.goT - dt);
 }
@@ -354,8 +376,15 @@ function clientStep(dt) {
 function render() {
   if (!g) return;
   ctx.save();
-  if (run.shake > 0) ctx.translate((Math.random() - 0.5) * run.shake, (Math.random() - 0.5) * run.shake);
   const cam = g.cam || 0;
+  if (run.shake > 0) ctx.translate(Math.sin(time * 61) * run.shake * 0.6, Math.cos(time * 47) * run.shake * 0.6);
+  if (run.zoom > 0) {
+    const zx = Math.max(0, Math.min(WORLD.w, run.zx - cam));
+    const zy = Math.max(0, Math.min(WORLD.h, run.zy));
+    ctx.translate(zx, zy);
+    ctx.scale(1 + run.zoom, 1 + run.zoom);
+    ctx.translate(-zx, -zy);
+  }
   if (g.solids) {
     ctx.drawImage(g.bg, 0, 0, WORLD.w, WORLD.h);
     R.drawParallax(ctx, g.level, cam);
@@ -373,10 +402,13 @@ function render() {
   for (const p of order) R.drawPlayer(ctx, p, p.info, time);
   R.drawModeWorld(ctx, g, time, 'front');
   R.drawParticles(ctx, run.parts);
+  FX.drawFx(ctx, run.fx);
   R.drawWater(ctx, time, g.level);
+  FX.drawLighting(ctx, g, run.fx, cam, time);
   ctx.restore();
   R.drawWeather(ctx, g.level, time);
   ctx.restore();
+  FX.drawVignette(ctx);
   if (run.demo) return;
   R.drawHUD(ctx, g);
   const goWord = { kusatma: 'SAVUN!', saldiri: 'SALDIR!', tac: 'TACI KAP!' }[g.mode.id] || 'KAPIŞ!';
@@ -402,8 +434,13 @@ function render() {
 }
 
 function frame(now) {
-  const dt = Math.min(0.1, (now - last) / 1000);
+  const rawDt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  let dt = rawDt;
+  if (run?.slow > 0 && !run.net) {
+    run.slow -= rawDt;
+    dt = rawDt * 0.35;
+  }
   if (screen === 'cutscene' && cut) {
     updateCutscene(cut.cs, dt);
     drawCutscene(ctx, cut.cs, cut.bg);
