@@ -911,6 +911,8 @@ function applyHeadStomp(
   victim.vy = Math.max(victim.vy, 120) + PHYSICS.STOMP_VICTIM_DOWN_IMPULSE * powerRatio;
   victim.lastHitBy = attacker.slotIndex;
   victim.lastHitTimer = PHYSICS.KILL_CREDIT_WINDOW;
+  // Brief grace window so a bouncing attacker can't stun-lock the same victim
+  victim.invulnTimer = Math.max(victim.invulnTimer, PHYSICS.STOMP_GRACE);
 
   sim.hitstopTimer = 0.055;
   sim.trauma = Math.min(1, sim.trauma + 0.48);

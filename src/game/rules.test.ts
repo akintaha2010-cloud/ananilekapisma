@@ -448,3 +448,70 @@ test('jokes and Hack Club secret codes', async () => {
   assert.equal(matchSecret(['q', ...konami.sequence])?.id, 'konami');
   assert.equal(matchSecret(['h', 'a', 'v']), null);
 });
+
+test('countdown freezes the fight and the match starts only after it hits zero', () => {
+  const settings: GameSettings = { ...DEFAULT_SETTINGS, mapId: 'classic', mode: 'ffa' };
+  const sim = createSimulation(settings, makeSlots(2));
+  sim.countdown = 3;
+  const p0 = sim.players[0];
+  const startY = p0.y;
+  for (let i = 0; i < 120; i++) {
+    stepSimulation(sim, { 0: { ...emptyInput(), right: true, jumpPressed: true } }, 1 / 60);
+  }
+  assert.equal(p0.y, startY, 'nobody moves during countdown');
+  assert.equal(sim.elapsedSec, 0);
+  assert.ok(sim.countdown > 0.9 && sim.countdown < 1.1);
+  for (let i = 0; i < 90; i++) stepSimulation(sim, {}, 1 / 60);
+  assert.equal(sim.countdown, 0);
+  for (let i = 0; i < 30; i++) stepSimulation(sim, {}, 1 / 60);
+  assert.ok(sim.elapsedSec > 0.3, 'fight runs after countdown');
+  assert.notEqual(p0.y, startY);
+});
+
+test('stomp grants a short grace window so the same victim cannot be stun-locked', () => {
+  const settings: GameSettings = { ...DEFAULT_SETTINGS, mapId: 'classic', mode: 'ffa' };
+  const sim = createSimulation(settings, makeSlots(2));
+  const [attacker, victim] = sim.players;
+  const setup = () => {
+    victim.x = 500;
+    victim.y = 560 - victim.h;
+    victim.vx = 0;
+    victim.vy = 0;
+    victim.grounded = true;
+    attacker.x = 500;
+    attacker.y = victim.y - attacker.h + 6;
+    attacker.vx = 0;
+    attacker.vy = 320;
+    attacker.invulnTimer = 0;
+  };
+  victim.invulnTimer = 0;
+  setup();
+  stepSimulation(sim, {}, 1 / 60);
+  assert.equal(attacker.stomps, 1);
+  assert.ok(victim.invulnTimer > 0.4);
+  for (let i = 0; i < 3; i++) stepSimulation(sim, {}, 1 / 60);
+  setup();
+  stepSimulation(sim, {}, 1 / 60);
+  assert.equal(attacker.stomps, 1, 'immediate re-stomp is ignored');
+});
+
+test('bots do not spam jumps or abilities every frame', () => {
+  const settings: GameSettings = { ...DEFAULT_SETTINGS, mapId: 'classic', mode: 'ffa' };
+  const slots: PlayerSlotConfig[] = [
+    { ...DEFAULT_SLOTS[0], kind: 'human' },
+    { ...DEFAULT_SLOTS[1], kind: 'bot', aiPersonality: 'aggressive' },
+  ];
+  const sim = createSimulation(settings, slots);
+  for (let i = 0; i < 60; i++) stepSimulation(sim, {}, 1 / 60);
+  const bot = sim.players[1];
+  let jumps = 0;
+  let abilities = 0;
+  for (let i = 0; i < 600; i++) {
+    const input = computeBotInput(bot, sim, 1 / 60);
+    if (input.jumpPressed) jumps++;
+    if (input.abilityPressed) abilities++;
+    stepSimulation(sim, { 1: input }, 1 / 60);
+  }
+  assert.ok(jumps < 60, `bot jumped ${jumps} times in 10s`);
+  assert.ok(abilities <= 6, `bot used ability ${abilities} times in 10s`);
+});

@@ -1056,6 +1056,7 @@ export default function App() {
     let totalTime = 0;
     let hudSyncAccum = 0;
     let titleRenderAccum = 1;
+    let pausedRenderAccum = 1;
     let lastCountdownTick = 0;
     let netSyncAccum = 0;
     let lastHudSignature = '';
@@ -1217,7 +1218,10 @@ export default function App() {
           }
         }
       } else {
-        // Paused or GameOver: freeze sim, render latest frame
+        // Paused or GameOver: sim frozen, so a low redraw rate is enough
+        pausedRenderAccum += dt;
+        if (pausedRenderAccum >= 1 / 12) {
+        pausedRenderAccum = 0;
         const sim = simRef.current;
         renderer.render(
           ctx,
@@ -1227,6 +1231,7 @@ export default function App() {
           totalTime,
           false
         );
+        }
       }
 
       inputHub.endFrame();
