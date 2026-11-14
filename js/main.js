@@ -1,5 +1,5 @@
 import { P, WORLD, centerX } from './physics.js';
-import { MAP_IDS, MAPS, createLevel, floorUnder } from './maps.js';
+import { MAP_IDS, ADVENTURE_IDS, MAPS, createLevel, floorUnder } from './maps.js';
 import { COLORS, HATS, STACHES, palette, drawCharacter, drawHat } from './character.js';
 import { KEYMAPS, createKeyboard, readKeys, readGamepad, mergeInputs, emptyInput, createTouch } from './input.js';
 import { DIFFICULTY } from './ai.js';
@@ -92,7 +92,12 @@ function dress(p) {
 
 function begin(cfg, opts = {}) {
   g = opts.view || createGame(cfg);
-  g.bg = R.createBackground(g.level);
+  const lv = g.level;
+  g.cam = 0;
+  if (lv.adventure) {
+    g.bg = R.createBackground({ ...lv, moatL: -40, moatR: WORLD.w + 40, platforms: [], windows: [200, 640, 1080], banners: [90, 420, 860, 1190] });
+    g.solids = R.createSolids(lv);
+  } else g.bg = R.createBackground(lv);
   g.players.forEach(dress);
   run = { cfg, demo: !!opts.demo, chapter: opts.chapter ?? -1, parts: R.createParticles(), shake: 0, freeze: 0, goT: 0, shown: false, net: opts.net || null };
   const local = g.players.some((p) => p.info.touch && p.info.control === 'human');
@@ -118,7 +123,7 @@ function say(text, x, y, color = '#ffe14d', size = 30) {
 }
 
 function banner(text, color = '#ffd27a') {
-  run.parts.push({ kind: 'text', text, x: WORLD.w / 2, y: 250, vx: 0, vy: -20, g: 0, life: 1.8, max: 1.8, size: 64, color, rot: 0, vr: 0 });
+  run.parts.push({ kind: 'text', text, x: (g.cam || 0) + WORLD.w / 2, y: 250, vx: 0, vy: -20, g: 0, life: 1.8, max: 1.8, size: 64, color, rot: 0, vr: 0 });
 }
 
 function play(name) {
@@ -194,7 +199,7 @@ function handleEvents(events) {
       case 'splash':
         play('splash');
         R.spawn(parts, 'drop', cx, WORLD.waterY, 22, { angle: -Math.PI / 2, spread: 1.4, speed: 520, color: '#9fe3ff', life: 0.8, g: 1300, size: 5 });
-        say('HENDEĞE!', Math.min(Math.max(cx, 90), WORLD.w - 90), WORLD.waterY - 60, '#9fe3ff', 28);
+        say('HENDEĞE!', Math.min(Math.max(cx, 90), g.level.width - 90), WORLD.waterY - 60, '#9fe3ff', 28);
         break;
       case 'unsquash':
         play('unsquash');
@@ -243,6 +248,18 @@ function handleEvents(events) {
         play('win');
         say('TACI KAPTI!', cx, p.y - 40, '#ffd34d', 30);
         break;
+      case 'ambush':
+        banner(e.cap ? 'BÖLÜKBAŞI GELİYOR!' : 'PUSU!', e.cap ? '#ff6b5b' : '#ffb07a');
+        play('start');
+        break;
+      case 'checkpoint':
+        say('KONTROL NOKTASI', e.x, 470, '#9dff7a', 26);
+        play('doublejump');
+        break;
+      case 'coin':
+        play('click');
+        R.spawn(parts, 'star', e.x, e.y, 4, { speed: 160, color: '#ffd34d', life: 0.4, size: 5, g: 200 });
+        break;
       case 'tick':
         play('click');
         break;
@@ -265,6 +282,16 @@ function animate(dt) {
     if (p.grounded) a.walk += Math.abs(p.vx) * dt * 0.05;
   }
   R.updateParticles(run.parts, dt);
+  if (g.level.adventure) {
+    const alive = g.players.filter((p) => p.info.kind === 'hero' && p.state !== 'out');
+    const mine = alive.filter((p) => p.info.control === 'human' || p.id === g.youId);
+    const focus = mine.length ? mine : alive;
+    if (focus.length) {
+      const cx = focus.reduce((a, p) => a + centerX(p), 0) / focus.length;
+      const target = Math.max(0, Math.min(g.level.width - WORLD.w, cx - WORLD.w * 0.42));
+      g.cam += (target - g.cam) * Math.min(1, dt * 5);
+    }
+  }
   run.shake = Math.max(0, run.shake - dt * 40);
   run.goT = Math.max(0, run.goT - dt);
 }
@@ -322,7 +349,18 @@ function render() {
   if (!g) return;
   ctx.save();
   if (run.shake > 0) ctx.translate((Math.random() - 0.5) * run.shake, (Math.random() - 0.5) * run.shake);
-  ctx.drawImage(g.bg, 0, 0, WORLD.w, WORLD.h);
+  const cam = g.cam || 0;
+  if (g.solids) {
+    const off = (cam * 0.35) % WORLD.w;
+    ctx.drawImage(g.bg, -off, 0, WORLD.w, WORLD.h);
+    ctx.drawImage(g.bg, WORLD.w - off, 0, WORLD.w, WORLD.h);
+    ctx.save();
+    ctx.translate(-cam, 0);
+    ctx.drawImage(g.solids, 0, 0);
+  } else {
+    ctx.drawImage(g.bg, 0, 0, WORLD.w, WORLD.h);
+    ctx.save();
+  }
   R.drawTorches(ctx, time, g.level);
   R.drawModeWorld(ctx, g, time, 'back');
   for (const pl of g.level.platforms) R.drawPlatform(ctx, pl, time);
@@ -331,6 +369,7 @@ function render() {
   R.drawModeWorld(ctx, g, time, 'front');
   R.drawParticles(ctx, run.parts);
   R.drawWater(ctx, time, g.level);
+  ctx.restore();
   R.drawWeather(ctx, g.level, time);
   ctx.restore();
   if (run.demo) return;
@@ -467,6 +506,7 @@ function pruneCanvases() {
 /* ---------- Quick play / events ---------- */
 
 function mapsFor(mode) {
+  if (mode === 'macera') return ADVENTURE_IDS;
   return MAP_IDS.filter((id) => {
     const lv = createLevel(id);
     if (mode === 'saldiri') return lv.platforms.some((pl) => pl.kind === 'throne');

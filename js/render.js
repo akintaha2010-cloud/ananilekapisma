@@ -212,6 +212,17 @@ export function createBackground(level) {
     ctx.fillRect(bx + 10, 280, 16, 95);
   });
 
+  drawSolids(ctx, level, th, rnd);
+
+  if (!th.dungeon) {
+    ctx.fillStyle = th.snow ? '#e8f0fb' : '#2d6b4f';
+    ctx.fillRect(0, WORLD.waterY - 6, L, 8);
+    ctx.fillRect(R, WORLD.waterY - 6, W - R, 8);
+  }
+  return c;
+}
+
+function drawSolids(ctx, level, th, rnd) {
   for (const pl of level.platforms) {
     if (pl.kind === 'floor') {
       bricks(ctx, pl.x, pl.y, pl.w, pl.h, th.floor, rnd, 60, 26);
@@ -239,10 +250,19 @@ export function createBackground(level) {
     ctx.fill();
   }
 
+}
+
+/** Static floors and towers of a scrolling level, drawn once into a wide canvas. */
+export function createSolids(level) {
+  const th = THEMES[level.theme] || THEMES.gece;
+  const c = document.createElement('canvas');
+  c.width = level.width;
+  c.height = H;
+  const ctx = c.getContext('2d');
+  drawSolids(ctx, level, th, seeded(7));
   if (!th.dungeon) {
     ctx.fillStyle = th.snow ? '#e8f0fb' : '#2d6b4f';
-    ctx.fillRect(0, WORLD.waterY - 6, L, 8);
-    ctx.fillRect(R, WORLD.waterY - 6, W - R, 8);
+    for (const [x0, x1] of level.water) ctx.fillRect(x0, WORLD.waterY - 6, x1 - x0, 8);
   }
   return c;
 }
@@ -283,6 +303,37 @@ export function drawPlatform(ctx, pl, t) {
     ctx.lineTo(x + w / 2, pl.move?.y0 !== undefined ? 0 : y - 220);
     ctx.lineTo(x + w - 14, y);
     ctx.stroke();
+  }
+  if (pl.kind === 'ship') {
+    ctx.fillStyle = '#5a3418';
+    ctx.strokeStyle = '#1b1030';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x - 14, y);
+    ctx.lineTo(x + w + 14, y);
+    ctx.lineTo(x + w - 18, y + 46);
+    ctx.lineTo(x + 18, y + 46);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#c8102e';
+    ctx.fillRect(x + 4, y + 14, w - 8, 6);
+    ctx.fillStyle = '#8a5a2b';
+    ctx.fillRect(x - 10, y - 4, w + 20, 8);
+    ctx.fillStyle = '#3a2716';
+    ctx.fillRect(x + w / 2 - 4, y - 170, 8, 170);
+    ctx.fillStyle = '#f4f1e8';
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2 + 6, y - 160);
+    ctx.quadraticCurveTo(x + w / 2 + 70 + Math.sin(t * 2) * 6, y - 110, x + w / 2 + 6, y - 40);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#c8102e';
+    ctx.beginPath();
+    ctx.arc(x + w / 2 + 30, y - 100, 12, 0, Math.PI * 2);
+    ctx.fill();
+    return;
   }
   if (pl.kind === 'bridge') {
     ctx.strokeStyle = '#2b2b33';
@@ -648,6 +699,9 @@ function drawModeHUD(ctx, g) {
   } else if (g.mode.id === 'saldiri') {
     const boss = g.players.find((p) => p.id === ms.boss);
     if (boss) bar(ctx, W / 2 - 160, 74, 320, 18, boss.lives / boss.info.maxLives, '#a040e0', `Kara Paşa  ${Math.max(0, boss.lives)}/${boss.info.maxLives}`);
+  } else if (g.mode.id === 'macera') {
+    const lead = Math.max(0, ...g.players.filter((p) => p.info.kind === 'hero' && p.state !== 'out').map((p) => p.x));
+    bar(ctx, W / 2 - 160, 74, 320, 18, Math.min(1, lead / ms.flag), '#4fc06a', `Çıkışa ${Math.max(0, Math.round((ms.flag - lead) / 40))} adım  ·  Altın ${ms.coins || 0}`);
   } else if (g.mode.id === 'tac') {
     ctx.font = '800 15px "Trebuchet MS", system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -662,7 +716,96 @@ function drawModeHUD(ctx, g) {
   }
 }
 
+function drawAdventure(ctx, g, t) {
+  const lv = g.level;
+  const ms = g.ms || {};
+  const got = new Set(ms.got || []);
+  (lv.coins || []).forEach((c, i) => {
+    if (got.has(i)) return;
+    const sq = Math.abs(Math.cos(t * 3 + c.x * 0.01));
+    ctx.fillStyle = '#7a4d08';
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y + Math.sin(t * 4 + i) * 3, 12 * sq + 2, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffd34d';
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y + Math.sin(t * 4 + i) * 3, 9 * sq + 1, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  for (const cp of lv.checkpoints || []) {
+    const fy = (lv.floorAt?.(cp) ?? lv.floorY);
+    const on = (ms.cp ?? 0) >= cp;
+    ctx.fillStyle = '#3a2716';
+    ctx.fillRect(cp - 3, fy - 110, 6, 110);
+    ctx.fillStyle = on ? '#c8102e' : '#8a8a96';
+    ctx.beginPath();
+    ctx.moveTo(cp + 3, fy - 108);
+    ctx.quadraticCurveTo(cp + 30, fy - 100 + Math.sin(t * 5) * 4, cp + 56, fy - 92);
+    ctx.lineTo(cp + 3, fy - 72);
+    ctx.fill();
+    if (on) {
+      ctx.fillStyle = '#f4f1e8';
+      ctx.beginPath();
+      ctx.arc(cp + 22, fy - 92, 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const fx = ms.flag ?? lv.flagX;
+  if (fx) {
+    const fy = lv.floorY;
+    ctx.fillStyle = '#4a4058';
+    ctx.strokeStyle = '#1b1030';
+    ctx.lineWidth = 5;
+    ctx.fillRect(fx - 90, fy - 230, 50, 230);
+    ctx.strokeRect(fx - 90, fy - 230, 50, 230);
+    ctx.fillRect(fx + 40, fy - 230, 50, 230);
+    ctx.strokeRect(fx + 40, fy - 230, 50, 230);
+    ctx.beginPath();
+    ctx.moveTo(fx - 100, fy - 230);
+    ctx.lineTo(fx + 100, fy - 230);
+    ctx.lineTo(fx + 100, fy - 270);
+    ctx.lineTo(fx - 100, fy - 270);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    for (let k = -100; k < 100; k += 40) {
+      ctx.fillRect(k + fx, fy - 292, 24, 24);
+      ctx.strokeRect(k + fx, fy - 292, 24, 24);
+    }
+    ctx.fillStyle = '#1d1430';
+    ctx.beginPath();
+    ctx.moveTo(fx - 40, fy);
+    ctx.lineTo(fx - 40, fy - 150);
+    ctx.arc(fx, fy - 150, 40, Math.PI, 0);
+    ctx.lineTo(fx + 40, fy);
+    ctx.fill();
+    const glow = ctx.createLinearGradient(0, fy - 190, 0, fy);
+    glow.addColorStop(0, 'rgba(255,220,120,0.9)');
+    glow.addColorStop(1, 'rgba(255,160,60,0.4)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.moveTo(fx - 30, fy);
+    ctx.lineTo(fx - 30, fy - 150);
+    ctx.arc(fx, fy - 150, 30, Math.PI, 0);
+    ctx.lineTo(fx + 30, fy);
+    ctx.fill();
+    ctx.fillStyle = '#3a2716';
+    ctx.fillRect(fx - 3, fy - 360, 6, 70);
+    ctx.fillStyle = '#c8102e';
+    ctx.beginPath();
+    ctx.moveTo(fx + 3, fy - 358);
+    ctx.quadraticCurveTo(fx + 40, fy - 350 + Math.sin(t * 4) * 5, fx + 76, fy - 340);
+    ctx.lineTo(fx + 3, fy - 318);
+    ctx.fill();
+    ctx.font = '900 22px "Trebuchet MS", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd27a';
+    ctx.fillText('ÇIKIŞ', fx, fy - 240);
+  }
+}
+
 export function drawModeWorld(ctx, g, t, layer) {
+  if (layer === 'back' && g.level.width > W) drawAdventure(ctx, g, t);
   const ms = g.ms;
   if (layer === 'back' && ms.gate) {
     const gt = ms.gate;

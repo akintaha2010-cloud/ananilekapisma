@@ -90,6 +90,7 @@ function respawn(g, p) {
       best = x;
     }
   }
+  best = g.mode.respawnX?.(g, p) ?? best;
   Object.assign(p, { x: best - p.w / 2, y: -90, vx: 0, vy: 200, state: 'normal', invuln: P.invulnAfterRespawn, splashed: false, airJumps: 1, grounded: false, platform: null });
   p.prevX = p.x;
   p.prevY = p.y;
@@ -115,7 +116,7 @@ function process(g, events) {
         break;
       case 'stomp':
         e.victim.lastHit = { id: p.id, t: g.time };
-        if (noLives || (p.info.kind === 'minion' && e.victim.info.kind === 'hero')) e.victim.lives += 1;
+        if (noLives || (p.info.kind === 'minion' && e.victim.info.kind === 'hero' && !g.mode.minionHurts)) e.victim.lives += 1;
         if (e.victim.lives <= 0) credit(g, e.victim, events);
         g.mode.onStomp?.(g, e, events);
         break;

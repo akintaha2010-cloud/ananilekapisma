@@ -233,13 +233,23 @@ export function aiInput(p, brain, players, level, dt, world) {
       brain.jumpHold = 0.3;
     }
   } else if (p.grounded && p.platform?.kind === 'floor' && wi.dist < 40 && dir === wi.side) {
-    const across = floorUnder(level, me + dir * 300);
+    const across = floorUnder(level, me + dir * 300) || (level.adventure && level.platforms.find((pl) => pl.move && Math.abs(pl.x + pl.w / 2 - (me + dir * 170)) < pl.w / 2 + 30));
     if (across && across !== p.platform) {
       brain.leap = dir;
       brain.leapT = 1.4;
       brain.jumpQueued = true;
       brain.jumpHold = 0.3;
     } else dir = 0;
+  }
+
+  if (dir) {
+    const feet = p.y + p.h;
+    const ahead = dir > 0 ? p.x + p.w + 26 : p.x - 26;
+    const wall = level.platforms.some((pl) => pl.solid && pl.y < feet - 8 && pl.y > feet - 300 && ahead > pl.x && ahead < pl.x + pl.w);
+    if (wall && (p.grounded || (p.vy > -120 && p.airJumps > 0 && !brain.lastJump))) {
+      brain.jumpQueued = true;
+      brain.jumpHold = 0.35;
+    }
   }
 
   if (brain.jumpQueued && !brain.lastJump) {

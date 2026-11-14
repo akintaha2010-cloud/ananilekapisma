@@ -265,8 +265,8 @@ export function collideLevel(p, level, events = []) {
   if (p.x < 0) {
     p.x = 0;
     p.vx = Math.max(0, p.vx);
-  } else if (p.x + p.w > WORLD.w) {
-    p.x = WORLD.w - p.w;
+  } else if (p.x + p.w > (level.width ?? WORLD.w)) {
+    p.x = (level.width ?? WORLD.w) - p.w;
     p.vx = Math.min(0, p.vx);
   }
   return events;

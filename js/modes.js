@@ -47,6 +47,7 @@ export function updateRocks(g, dt, events) {
     const alive = g.players.filter((p) => p.state !== 'out');
     let x = lv.moatL + 40 + g.rand() * (lv.moatR - lv.moatL - 80);
     if (alive.length && g.rand() < 0.55) x = centerX(pick(g, alive)) + (g.rand() - 0.5) * 120;
+    else if (alive.length && lv.width > WORLD.w) x = centerX(pick(g, alive)) + (g.rand() - 0.5) * 700;
     x = Math.max(lv.moatL + 20, Math.min(lv.moatR - 20, x));
     ms.rocks.push({ id: ms.rockN++, x, y: -60, vy: 0, r: 24, warn: 1.1, ty: landingY(lv, x) });
     events.push({ type: 'rockwarn', x });
@@ -108,7 +109,7 @@ export function updateRocks(g, dt, events) {
 function spawnMinion(g, opts = {}) {
   const lv = g.level;
   const left = g.rand() < 0.5;
-  const x = left ? lv.moatL + 50 + g.rand() * 160 : lv.moatR - 50 - g.rand() * 160;
+  const x = opts.x ?? (left ? lv.moatL + 50 + g.rand() * 160 : lv.moatR - 50 - g.rand() * 160);
   return g.addPlayer({
     kind: opts.kind || 'minion',
     control: 'cpu',
@@ -124,7 +125,7 @@ function spawnMinion(g, opts = {}) {
     spd: opts.spd || 0.78,
     mass: opts.mass || 0.9,
     x,
-    y: -70,
+    y: opts.y ?? -70,
     invuln: 1,
   });
 }
@@ -334,6 +335,71 @@ function dropCrown(g, p, events) {
   events.push({ type: 'crowndrop', p });
 }
 
+/* ---------- Macera: sağa ilerle, kapıya ulaş ---------- */
+
+const CAPTAIN = { name: 'Bölükbaşı', hat: 'bork', stache: 'pala', scale: 1.25, mass: 1.7, spd: 0.8, lives: 2, diff: 'orta', tag: 'BÖLÜK' };
+
+const macera = {
+  id: 'macera',
+  name: 'Macera',
+  desc: 'Sağa doğru ilerle, pusudaki düşmanları ez, altınları topla, kapıya ulaş!',
+  team: true,
+  adventure: true,
+  minionHurts: true,
+  init(g) {
+    const lv = g.level;
+    Object.assign(g.ms, { zone: 0, cp: lv.spawns[0].x, coins: 0, got: [], flag: lv.flagX ?? lv.width - 150 });
+  },
+  update(g, dt, events) {
+    const hs = aliveHeroes(g);
+    if (!hs.length) return;
+    const lead = Math.max(...hs.map(centerX));
+    const ms = g.ms;
+    const zones = g.level.zones || [];
+    while (ms.zone < zones.length && lead > zones[ms.zone].x) {
+      const z = zones[ms.zone++];
+      for (const f of z.foes) {
+        const cap = f.cap ? CAPTAIN : {};
+        const m = spawnMinion(g, { diff: g.cfg.enemyDiff || 'kolay', ...cap, x: f.x, y: f.y ?? -60 });
+        m.homeX = f.x;
+        events.push({ type: 'spawn', p: m });
+      }
+      events.push({ type: 'ambush', n: ms.zone, x: z.x, cap: z.foes.some((f) => f.cap) });
+    }
+    for (const cp of g.level.checkpoints || []) {
+      if (cp > ms.cp && lead > cp) {
+        ms.cp = cp;
+        events.push({ type: 'checkpoint', x: cp });
+      }
+    }
+    (g.level.coins || []).forEach((c, i) => {
+      if (ms.got.includes(i)) return;
+      const p = hs.find((h) => Math.abs(centerX(h) - c.x) < h.w / 2 + 12 && c.y > h.y - 12 && c.y < h.y + h.h + 12);
+      if (!p) return;
+      ms.got.push(i);
+      ms.coins++;
+      events.push({ type: 'coin', p, x: c.x, y: c.y });
+    });
+  },
+  respawnX(g) {
+    return g.ms.cp;
+  },
+  aiGoal(g, p) {
+    const me = centerX(p);
+    if (p.team === 'B') {
+      const near = aliveHeroes(g).filter((h) => Math.abs(centerX(h) - me) < 750).sort((a, b) => Math.abs(centerX(a) - me) - Math.abs(centerX(b) - me))[0];
+      return near ? { targetId: near.id } : { x: p.homeX ?? me, stay: true };
+    }
+    const foe = enemies(g).filter((e) => Math.abs(centerX(e) - me) < 380).sort((a, b) => Math.abs(centerX(a) - me) - Math.abs(centerX(b) - me))[0];
+    if (foe) return { targetId: foe.id };
+    const lead = Math.max(...aliveHeroes(g).map(centerX));
+    return { x: Math.min(g.ms.flag + 60, Math.max(lead + 160, me + 200)) };
+  },
+  check(g) {
+    return teamCheck(g, () => (aliveHeroes(g).some((h) => centerX(h) > g.ms.flag) ? { team: 'A', reason: 'Kapıya ulaştın!' } : null));
+  },
+};
+
 export const MODES = {
   kapisma: { id: 'kapisma', name: 'Kapışma', desc: 'Ez, it, hendeğe at. Son ayakta kalan kazanır.', check: ffaCheck },
   mancinik: {
@@ -346,6 +412,7 @@ export const MODES = {
   tac,
   kusatma,
   saldiri,
+  macera,
 };
 
 export const MODE_IDS = Object.keys(MODES);

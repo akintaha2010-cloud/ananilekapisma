@@ -92,10 +92,145 @@ const DEFS = {
   },
 };
 
+/* Kayan ekranlı macera bölümleri. ground: [x, w], towers: [x, w, top], ledges: [x, y, w, kind?], movers: [kind, x, y, w, move] */
+const ADV = {
+  giris: {
+    name: 'Kale Kapısı',
+    theme: 'gece',
+    width: 4300,
+    ground: [[0, 900], [1100, 700], [1960, 980], [3120, 1180]],
+    towers: [[1300, 120, 540], [2350, 160, 500], [3450, 140, 520]],
+    ledges: [[860, 590, 280, 'bridge'], [1520, 500, 180], [2120, 470, 170], [2640, 470, 200], [3660, 480, 180], [3900, 400, 160]],
+    movers: [['lift', 2900, 560, 130, { x0: 2900, x1: 3040, speed: 0.45 }]],
+    zones: [[450, [1250, 1550]], [1700, [2150, 2250, 2600]], [2880, [3350, 3600, 3750, { x: 3950, cap: 1 }]]],
+    cps: [1150, 1990, 3150],
+    flag: 4150,
+  },
+  hurdalik: {
+    name: 'Hurdalık',
+    theme: 'gunduz',
+    width: 4600,
+    ground: [[0, 1000], [1180, 900], [2280, 700], [3150, 1450]],
+    towers: [[600, 140, 540], [1450, 120, 520], [1700, 200, 460], [2500, 150, 520], [3500, 180, 500], [3900, 120, 540]],
+    ledges: [[880, 520, 180], [1250, 430, 160], [2050, 520, 160], [2750, 450, 200], [3300, 520, 160], [3700, 400, 170]],
+    movers: [['lift', 2995, 600, 140, { y0: 600, y1: 420, speed: 0.4 }]],
+    zones: [[350, [900, 1100]], [1250, [1600, 1850, 2000]], [2300, [2700, 2850, 3000]], [3200, [3600, 3800, { x: 4200, cap: 1 }, 4350]]],
+    cps: [1200, 2300, 3200],
+    flag: 4450,
+  },
+  liman: {
+    name: 'Korsan Limanı',
+    theme: 'safak',
+    width: 4800,
+    ground: [[0, 700], [1300, 500], [2400, 450], [3500, 1300]],
+    towers: [[400, 140, 540], [1500, 160, 500], [3800, 140, 520], [4300, 120, 540]],
+    ledges: [[1650, 420, 160], [2550, 480, 180], [4000, 440, 180]],
+    movers: [
+      ['ship', 760, 600, 200, { x0: 720, x1: 1080, speed: 0.35 }],
+      ['ship', 1840, 600, 200, { x0: 1820, x1: 2180, speed: 0.4 }],
+      ['ship', 2890, 600, 180, { x0: 2870, x1: 3060, speed: 0.5 }],
+      ['ship', 3150, 560, 180, { x0: 3120, x1: 3300, speed: 0.45 }],
+    ],
+    zones: [[250, [600]], [1100, [1450, 1650, 1750]], [2200, [2550, 2700, 2800]], [3400, [3800, 4000, { x: 4400, cap: 1 }]]],
+    cps: [1320, 2420, 3520],
+    flag: 4650,
+  },
+  kule: {
+    name: 'Büyü Kulesi',
+    theme: 'kis',
+    width: 4000,
+    ground: [[0, 1300], [1450, 1100], [2700, 1300]],
+    towers: [[500, 120, 540], [900, 140, 470], [1700, 120, 540], [2100, 180, 440], [3000, 140, 520], [3400, 160, 460]],
+    ledges: [[700, 420, 160], [1250, 540, 250, 'bridge'], [1900, 380, 160], [2500, 540, 250, 'bridge'], [3200, 360, 160]],
+    movers: [],
+    zones: [[300, [800, 1000]], [1400, [1800, 2000, 2300]], [2600, [3000, 3300, { x: 3700, cap: 1 }]]],
+    cps: [1460, 2710],
+    flag: 3850,
+  },
+  atolye: {
+    name: 'Yeraltı Atölyesi',
+    theme: 'zindan',
+    width: 4400,
+    ground: [[0, 800], [1050, 800], [2100, 900], [3250, 1150]],
+    towers: [[400, 160, 500], [1300, 140, 520], [1600, 160, 470], [2400, 200, 450], [2800, 120, 540], [3600, 160, 500]],
+    ledges: [[600, 400, 160], [1450, 380, 160], [2650, 400, 160], [3850, 420, 200]],
+    movers: [
+      ['lift', 860, 600, 130, { y0: 600, y1: 380, speed: 0.4 }],
+      ['lift', 1860, 560, 120, { x0: 1860, x1: 1980, speed: 0.5 }],
+      ['lift', 3060, 600, 130, { y0: 600, y1: 420, speed: 0.5 }],
+    ],
+    zones: [[300, [700, 900]], [1100, [1500, 1700, 1800]], [2150, [2500, 2700, 2900]], [3300, [3700, 3900, { x: 4100, cap: 1 }, { x: 4200, cap: 1 }]]],
+    cps: [1060, 2110, 3260],
+    flag: 4280,
+  },
+};
+
+export const ADVENTURE_IDS = Object.keys(ADV);
+
+function createAdventure(id, themeId) {
+  const d = ADV[id];
+  let n = 0;
+  const platforms = [
+    ...d.ground.map(([x, w]) => floor(x, w, `g${n++}`)),
+    ...d.towers.map(([x, w, y]) => tower(`t${n++}`, x, w, y)),
+    ...d.ledges.map(([x, y, w, kind]) => plank(`l${n++}`, kind || 'ledge', x, y, w)),
+    ...d.movers.map(([kind, x, y, w, move]) => plank(`m${n++}`, kind, x, y, w, move)),
+  ];
+  for (const pl of platforms) if (pl.move) placeMover(pl, 0);
+  for (const pl of platforms) if (pl.move) pl.dx = pl.dy = 0;
+  const floors = platforms.filter((pl) => pl.kind === 'floor').sort((a, b) => a.x - b.x);
+  const water = [];
+  let x = 0;
+  for (const f of floors) {
+    if (f.x > x) water.push([x, f.x]);
+    x = Math.max(x, f.x + f.w);
+  }
+  if (x < d.width) water.push([x, d.width]);
+  const topAt = (sx) => {
+    let y = FLOOR_Y;
+    for (const pl of platforms) if (pl.solid && sx > pl.x && sx < pl.x + pl.w) y = Math.min(y, pl.y);
+    return y;
+  };
+  const coins = [];
+  for (const pl of platforms) {
+    if (pl.kind === 'floor' || pl.move) continue;
+    for (let k = -1; k <= 1; k++) coins.push({ x: pl.x + pl.w / 2 + k * 36, y: pl.y - 34 });
+  }
+  for (const [x0, x1] of water) {
+    if (x0 === 0 || x1 - x0 > 420) continue;
+    for (let k = 0; k < 3; k++) coins.push({ x: x0 + ((x1 - x0) * (k + 1)) / 4, y: 540 - (k === 1) * 30 });
+  }
+  return {
+    id,
+    name: d.name,
+    theme: THEMES[themeId] ? themeId : d.theme,
+    adventure: true,
+    width: d.width,
+    moatL: 0,
+    moatR: d.width,
+    floorY: FLOOR_Y,
+    platforms,
+    floors,
+    water,
+    spawns: [110, 180, 250, 320].map((sx) => ({ x: sx, y: topAt(sx) })),
+    respawnXs: [110, ...d.cps],
+    checkpoints: d.cps,
+    zones: d.zones.map(([zx, foes]) => ({ x: zx, foes: foes.map((f) => (typeof f === 'number' ? { x: f } : f)).map((f) => ({ ...f, y: topAt(f.x) - 70 })) })),
+    coins,
+    flagX: d.flag,
+    floorAt: topAt,
+    windows: [],
+    banners: [],
+    torches: d.towers.map(([tx, w, y]) => [tx + w / 2, y - 30]),
+    time: 0,
+  };
+}
+
 export const MAP_IDS = Object.keys(DEFS);
-export const MAPS = Object.fromEntries(MAP_IDS.map((id) => [id, { id, name: DEFS[id].name, theme: DEFS[id].theme }]));
+export const MAPS = Object.fromEntries([...MAP_IDS.map((id) => [id, { id, name: DEFS[id].name, theme: DEFS[id].theme }]), ...ADVENTURE_IDS.map((id) => [id, { id, name: ADV[id].name, theme: ADV[id].theme, adventure: true }])]);
 
 export function createLevel(id = 'avlu', themeId) {
+  if (ADV[id]) return createAdventure(id, themeId);
   const def = DEFS[id] || DEFS.avlu;
   const [moatL, moatR] = def.moat;
   const platforms = def.platforms();
@@ -132,6 +267,7 @@ export function createLevel(id = 'avlu', themeId) {
     respawnXs: [0.16, 0.33, 0.5, 0.67, 0.84].map((k) => moatL + span * k).filter((rx) => floorUnder({ floors }, rx)),
     windows: [0.22, 0.5, 0.78].map((k) => moatL + span * k),
     banners: [0.11, 0.36, 0.64, 0.89].map((k) => moatL + span * k),
+    width: W,
     torches: [
       [moatL + span * 0.36, 540],
       [moatL + span * 0.64, 540],

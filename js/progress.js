@@ -148,7 +148,7 @@ export const totalStars = (save) => Object.values(save.stars).reduce((a, b) => a
 /** Applies the result of a finished match to the save. Returns { gold, stars, newStars }. */
 export function reward(save, g, chapterIdx = -1, hero = heroOf(g)) {
   const win = won(g, hero);
-  let gold = (win ? 25 : 8) + hero.stomps * 4 + hero.kills * 3;
+  let gold = (win ? 25 : 8) + hero.stomps * 4 + hero.kills * 3 + (g.ms?.coins || 0);
   let stars = 0;
   let newStars = 0;
   if (chapterIdx >= 0) {
