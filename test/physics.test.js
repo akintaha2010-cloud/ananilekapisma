@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createPlayer, stepPlayer, resolvePlayers, applyShockwave, isStomp, P } from '../js/physics.js';
-import { createLevel } from '../js/level.js';
+import { createLevel } from '../js/maps.js';
 import { emptyInput } from '../js/input.js';
 import { simulate } from '../tools/sim.mjs';
 

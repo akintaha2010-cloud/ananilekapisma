@@ -29,12 +29,17 @@ export const P = {
 };
 
 export function createPlayer(id, x, y, opts = {}) {
+  const scale = opts.scale ?? 1;
   return {
     id,
     x,
     y,
-    w: P.w,
-    h: P.h,
+    w: Math.round(P.w * scale),
+    h: Math.round(P.h * scale),
+    scale,
+    spd: opts.spd ?? 1,
+    mass: opts.mass ?? 1,
+    team: opts.team ?? null,
     vx: 0,
     vy: 0,
     prevX: x,
@@ -55,8 +60,11 @@ export function createPlayer(id, x, y, opts = {}) {
     lives: opts.lives ?? 3,
     stomps: 0,
     falls: 0,
+    kills: 0,
   };
 }
+
+export const sameTeam = (a, b) => a.team != null && a.team === b.team;
 
 export const centerX = (p) => p.x + p.w / 2;
 
@@ -76,6 +84,10 @@ function approach(v, target, amount) {
 }
 
 export function stepPlayer(p, inp, dt, level, events = []) {
+  if (p.state !== 'out' && p.grounded && p.platform) {
+    p.x += p.platform.dx || 0;
+    p.y += p.platform.dy || 0;
+  }
   p.prevX = p.x;
   p.prevY = p.y;
   if (p.state === 'out') return events;
@@ -85,8 +97,6 @@ export function stepPlayer(p, inp, dt, level, events = []) {
   p.dropT = Math.max(0, p.dropT - dt);
   p.coyote = Math.max(0, p.coyote - dt);
   p.jumpBuf = Math.max(0, p.jumpBuf - dt);
-
-  if (p.grounded && p.platform && p.platform.dx) p.x += p.platform.dx;
 
   if (p.state === 'squashed') {
     p.squashT -= dt;
@@ -119,12 +129,13 @@ export function stepPlayer(p, inp, dt, level, events = []) {
     if (p.vy > 0) p.vy *= 0.6;
   } else if (p.state !== 'pound') {
     const accel = p.grounded ? P.accel : P.airAccel;
+    const max = P.maxSpeed * p.spd;
     if (dir) {
       p.facing = dir;
-      if (Math.abs(p.vx) <= P.maxSpeed || Math.sign(p.vx) !== dir) {
-        p.vx = approach(p.vx, dir * P.maxSpeed, accel * dt);
+      if (Math.abs(p.vx) <= max || Math.sign(p.vx) !== dir) {
+        p.vx = approach(p.vx, dir * max, accel * dt);
       } else {
-        p.vx = approach(p.vx, dir * P.maxSpeed, (p.grounded ? P.friction : P.airDrag) * dt);
+        p.vx = approach(p.vx, dir * max, (p.grounded ? P.friction : P.airDrag) * dt);
       }
     } else {
       p.vx = approach(p.vx, 0, (p.grounded ? P.friction : P.airDrag) * dt);
@@ -210,7 +221,8 @@ export function collideLevel(p, level, events = []) {
       const left = Math.min(pl.x, plPrevX);
       const right = Math.max(pl.x, plPrevX) + pl.w;
       if (p.x + p.w - 8 <= left || p.x + 8 >= right) continue;
-      if (prevBottom <= pl.y + 0.5 && bottom >= pl.y) {
+      const plPrevY = pl.y - (pl.dy || 0);
+      if (prevBottom <= Math.max(pl.y, plPrevY) + 0.5 && bottom >= pl.y) {
         if (!landedOn || pl.y < landedOn.y) landedOn = pl;
       }
     }
@@ -274,13 +286,13 @@ function stomp(top, bottom, jumpHeld, events) {
   top.airJumps = 1;
   top.grounded = false;
   top.platform = null;
-  if (bottom.invuln > 0) {
+  if (bottom.invuln > 0 || sameTeam(top, bottom)) {
     events.push({ type: 'bonk', p: top, victim: bottom });
     return;
   }
   bottom.lives -= 1;
   bottom.state = 'squashed';
-  bottom.squashT = P.squashTime;
+  bottom.squashT = P.squashTime / Math.sqrt(bottom.mass);
   bottom.shoveT = 0;
   bottom.vx = 0;
   top.stomps += 1;
@@ -288,8 +300,9 @@ function stomp(top, bottom, jumpHeld, events) {
 }
 
 function knock(attacker, victim, events) {
-  victim.vx = attacker.facing * P.knockback;
-  victim.vy = -P.knockUp;
+  const m = Math.max(0.4, victim.mass / attacker.mass);
+  victim.vx = (attacker.facing * P.knockback) / m;
+  victim.vy = -P.knockUp / Math.sqrt(m);
   victim.grounded = false;
   victim.platform = null;
   victim.shoveT = 0;
@@ -320,8 +333,9 @@ export function resolvePlayers(players, inputs, events = []) {
       a.x += (dirA * ox) / 2;
       b.x -= (dirA * ox) / 2;
 
-      const aHits = a.shoveT > 0 && a.facing === -dirA;
-      const bHits = b.shoveT > 0 && b.facing === dirA;
+      const friends = sameTeam(a, b);
+      const aHits = !friends && a.shoveT > 0 && a.facing === -dirA;
+      const bHits = !friends && b.shoveT > 0 && b.facing === dirA;
       if (aHits && bHits) {
         a.vx = dirA * P.knockback * 0.6;
         b.vx = -dirA * P.knockback * 0.6;
@@ -350,12 +364,13 @@ export function resolvePlayers(players, inputs, events = []) {
 export function applyShockwave(src, players, events = []) {
   const cx = centerX(src);
   const bottom = src.y + src.h;
+  const radius = P.shockRadius * Math.sqrt(src.scale || 1);
   for (const o of players) {
-    if (o === src || !isActive(o) || o.invuln > 0) continue;
+    if (o === src || !isActive(o) || o.invuln > 0 || sameTeam(src, o)) continue;
     const dx = centerX(o) - cx;
     const dy = o.y + o.h - bottom;
-    if (Math.abs(dx) > P.shockRadius || Math.abs(dy) > 24 || !o.grounded) continue;
-    const power = 1 - Math.abs(dx) / P.shockRadius;
+    if (Math.abs(dx) > radius || Math.abs(dy) > 24 || !o.grounded) continue;
+    const power = (1 - Math.abs(dx) / radius) * Math.min(1.6, src.mass / o.mass);
     o.vx = Math.sign(dx || 1) * (360 + 420 * power);
     o.vy = -(300 + 300 * power);
     o.grounded = false;
