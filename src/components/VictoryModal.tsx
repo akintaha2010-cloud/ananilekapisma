@@ -103,6 +103,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               <div className="relative p-3 rounded-none bg-slate-900 border-2 border-amber-500/50">
                 <CharacterPreviewSvg
                   costume={winner.costume}
+                  heroId={winner.heroId}
                   size={96}
                   celebrating
                 />

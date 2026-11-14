@@ -203,6 +203,30 @@ export const HEROES: HeroDef[] = [
       accessoryId: 'hale',
     },
   },
+  {
+    id: 'akin',
+    name: 'Akın',
+    title: 'Haven Ankara Kahramanı',
+    description: 'Güneş gözlüklü, çiçekli gömlekli kodcu! Hızlı koşar, çift zıplar ve laptopuyla her şeyi ship eder.',
+    unlockLevel: 1,
+    abilityName: 'SHIP IT!',
+    abilityDesc: 'Laptopunu açıp kod dalgası patlatır: yakındaki herkesi havaya uçurur. Ctrl+Alt+Delete hissi!',
+    abilityCooldown: 4,
+    abilityKind: 'ship_it',
+    stats: {
+      speedMult: 1.08,
+      jumpMult: 1.06,
+      weightMult: 1.0,
+      maxJumps: 2,
+      stompPower: 1.05,
+    },
+    defaultCostume: {
+      colorId: 'turquoise',
+      fesStyle: 'klasik_fes',
+      mustacheStyle: 'kaytan',
+      accessoryId: 'yok',
+    },
+  },
 ];
 
 export function getHeroDef(heroId?: HeroId): HeroDef {

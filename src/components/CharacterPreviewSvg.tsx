@@ -1,10 +1,11 @@
 import { MASCOT_EARS, MASCOT_QUILLS } from '../game/mascot';
 import React from 'react';
 import { CHARACTER_COLORS } from '../game/constants';
-import { CostumeConfig } from '../game/types';
+import { CostumeConfig, HeroId } from '../game/types';
 
 interface CharacterPreviewSvgProps {
   costume: CostumeConfig;
+  heroId?: HeroId;
   size?: number;
   celebrating?: boolean;
   className?: string;
@@ -37,13 +38,41 @@ const BODY_ROWS: [number, number][] = [
   [-3, 5],
 ];
 
+const AKIN_RECTS: [number, number, number, number, string][] = [
+  [-7, -11, 7, 8, '#111018'], [-6, -11, 5, 7, '#1C1B26'], [-7, -4, 8, 4, '#111018'], [-6, -4, 7, 3, '#F1F5F9'], [-6, -2, 7, 1, '#94A3B8'],
+  [0, -11, 7, 8, '#111018'], [1, -11, 5, 7, '#1C1B26'], [0, -4, 8, 4, '#111018'], [1, -4, 7, 3, '#F1F5F9'], [1, -2, 7, 1, '#94A3B8'],
+  [-11, -19, 4, 7, '#111018'], [-10, -19, 2, 4, '#4E9CC4'], [-10, -15, 2, 2, '#D99A6C'],
+  [-8, -21, 16, 11, '#111018'], [-7, -20, 14, 9, '#7CC6E8'], [-7, -12, 14, 1, '#4E9CC4'], [-2, -20, 4, 9, '#FFFFFF'],
+  [-5, -18, 1, 1, '#F6E7C1'], [-6, -15, 1, 1, '#E58FA0'], [4, -19, 1, 1, '#E58FA0'], [5, -14, 1, 1, '#F6E7C1'], [-4, -13, 1, 1, '#F6E7C1'],
+  [-2, -20, 1, 4, '#111018'], [1, -20, 1, 4, '#111018'], [-2, -16, 4, 3, '#111018'], [-1, -15, 2, 1, '#FDE047'],
+  [6, -19, 5, 7, '#111018'], [7, -19, 3, 4, '#7CC6E8'], [7, -15, 3, 2, '#F4C49C'],
+  [-6, -31, 12, 11, '#111018'], [-5, -30, 10, 9, '#F4C49C'], [-6, -26, 1, 2, '#D99A6C'],
+  [-7, -35, 14, 6, '#111018'], [-6, -34, 12, 4, '#4A2C1D'], [-7, -31, 3, 3, '#4A2C1D'], [-5, -37, 2, 3, '#4A2C1D'], [-1, -38, 2, 4, '#4A2C1D'],
+  [3, -37, 3, 3, '#4A2C1D'], [6, -33, 2, 2, '#4A2C1D'], [-3, -34, 4, 1, '#6E4330'],
+  [-4, -28, 10, 1, '#111018'], [-3, -28, 4, 3, '#111018'], [2, -28, 4, 3, '#111018'], [-2, -28, 1, 1, '#64748B'], [3, -28, 1, 1, '#64748B'],
+  [0, -23, 3, 1, '#7A3B2E'], [3, -24, 1, 1, '#7A3B2E'],
+];
+
 export const CharacterPreviewSvg: React.FC<CharacterPreviewSvgProps> = ({
   costume,
+  heroId,
   size = 84,
   celebrating = false,
   className = '',
 }) => {
   const theme = CHARACTER_COLORS[costume.colorId];
+
+  if (heroId === 'akin') {
+    return (
+      <svg width={size} height={size} viewBox="-21 -46 42 50" shapeRendering="crispEdges" className={className} aria-hidden="true">
+        <g className={celebrating ? 'animate-bounce' : ''}>
+          {AKIN_RECTS.map(([x, y, w, h, fill], i) => (
+            <rect key={i} x={x} y={y} width={w} height={h} fill={fill} />
+          ))}
+        </g>
+      </svg>
+    );
+  }
 
   return (
     <svg

@@ -115,7 +115,7 @@ export const GameHud: React.FC<GameHudProps> = ({
                     className="w-10 h-10 bg-slate-900 border-2 flex items-center justify-center overflow-hidden"
                     style={{ borderColor: theme.primary }}
                   >
-                    <CharacterPreviewSvg costume={p.costume} size={36} />
+                    <CharacterPreviewSvg costume={p.costume} heroId={p.heroId} size={36} />
                   </div>
                   <span
                     className=" -mt-1.5 px-1 text-[9px] font-display font-bold text-white border border-black"

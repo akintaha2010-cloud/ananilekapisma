@@ -1119,6 +1119,9 @@ export class CastleRenderer {
     const limbSpread = Math.round(flattenFactor * 7);
     const acc = char.costume.accessoryId ?? 'yok';
 
+    const isAkin = char.heroId === 'akin';
+    if (isAkin) this.drawPixelAkin(ctx, char, timeSec, flash, walkStep, isPancaked);
+    if (!isAkin) {
     // 0. Back Accessories (Pelerin / Kalkan / Kanat)
     if (acc === 'pelerin') {
       const capeDir = -char.facing;
@@ -1378,6 +1381,8 @@ export class CastleRenderer {
       ctx.fillRect(-3, haloY, 4, 1);
     }
 
+    }
+
     // 7. Active Frost/Power Shield Aura
     if (char.shieldTimer > 0) {
       const shimmer = Math.floor(timeSec * 14) % 2 === 0;
@@ -1416,6 +1421,106 @@ export class CastleRenderer {
         ctx.fillRect(cx - 1, tagY + 8, 2, 2);
       }
     }
+  }
+
+  private drawPixelAkin(
+    ctx: CanvasRenderingContext2D,
+    char: CharacterEntity,
+    timeSec: number,
+    flash: boolean,
+    walkStep: number,
+    isPancaked: boolean
+  ) {
+    const c = (col: string) => (flash ? '#FFFFFF' : col);
+    const OUT = c('#111018');
+    const SKIN = c('#F4C49C');
+    const SKIN_D = c('#D99A6C');
+    const HAIR = c('#4A2C1D');
+    const HAIR_L = c('#6E4330');
+    const SHIRT = c('#7CC6E8');
+    const SHIRT_D = c('#4E9CC4');
+    const FLOWER = c('#F6E7C1');
+    const FLOWER2 = c('#E58FA0');
+    const PANTS = c('#1C1B26');
+    const SHOE = c('#F1F5F9');
+    const SHOE_D = c('#94A3B8');
+    const R = (x: number, y: number, w: number, h: number, col: string) => {
+      ctx.fillStyle = col;
+      ctx.fillRect(x, y, w, h);
+    };
+    ctx.save();
+    if (char.facing < 0) ctx.scale(-1, 1);
+    if (isPancaked) ctx.scale(1.3, 0.45);
+    const air = !char.grounded;
+    const lift = (side: number) =>
+      air ? (side < 0 ? -2 : 0) : walkStep === (side < 0 ? 1 : 3) ? -2 : 0;
+    const stride = air ? 0 : walkStep === 1 ? 1 : walkStep === 3 ? -1 : 0;
+    const bob = !air && (walkStep === 1 || walkStep === 3) ? -1 : 0;
+
+    // legs + sneakers
+    for (const side of [-1, 1]) {
+      const lx = side < 0 ? -6 + stride : 1 - stride;
+      const ly = lift(side);
+      R(lx - 1, -11 + ly, 7, 8, OUT);
+      R(lx, -11 + ly, 5, 7, PANTS);
+      R(lx - 1, -4 + ly, 8, 4, OUT);
+      R(lx, -4 + ly, 7, 3, SHOE);
+      R(lx, -2 + ly, 7, 1, SHOE_D);
+    }
+
+    ctx.translate(0, bob);
+    // back arm
+    const swing = air ? -3 : walkStep === 1 ? 2 : walkStep === 3 ? -2 : 0;
+    R(-11, -19 - swing, 4, 7, OUT);
+    R(-10, -19 - swing, 2, 4, SHIRT_D);
+    R(-10, -15 - swing, 2, 2, SKIN_D);
+
+    // torso: open hawaiian shirt over white tee
+    R(-8, -21, 16, 11, OUT);
+    R(-7, -20, 14, 9, SHIRT);
+    R(-7, -12, 14, 1, SHIRT_D);
+    R(-2, -20, 4, 9, c('#FFFFFF'));
+    R(-5, -18, 1, 1, FLOWER);
+    R(-6, -15, 1, 1, FLOWER2);
+    R(4, -19, 1, 1, FLOWER2);
+    R(5, -14, 1, 1, FLOWER);
+    R(-4, -13, 1, 1, FLOWER);
+    // lanyard + badge
+    R(-2, -20, 1, 4, OUT);
+    R(1, -20, 1, 4, OUT);
+    R(-2, -16, 4, 3, OUT);
+    R(-1, -15, 2, 1, c('#FDE047'));
+
+    // front arm with fist
+    R(6, -19 + swing, 5, 7, OUT);
+    R(7, -19 + swing, 3, 4, SHIRT);
+    R(7, -15 + swing, 3, 2, SKIN);
+
+    // head
+    R(-6, -31, 12, 11, OUT);
+    R(-5, -30, 10, 9, SKIN);
+    R(-6, -26, 1, 2, SKIN_D);
+    // messy hair
+    R(-7, -35, 14, 6, OUT);
+    R(-6, -34, 12, 4, HAIR);
+    R(-7, -31, 3, 3, HAIR);
+    const flick = Math.floor(timeSec * 3 + char.slotIndex) % 2;
+    R(-5, -37, 2, 3, HAIR);
+    R(-1, -38 + flick, 2, 4, HAIR);
+    R(3, -37, 3, 3, HAIR);
+    R(6, -33, 2, 2, HAIR);
+    R(-3, -34, 4, 1, HAIR_L);
+    // sunglasses
+    R(-4, -28, 10, 1, OUT);
+    R(-3, -28, 4, 3, OUT);
+    R(2, -28, 4, 3, OUT);
+    R(-2, -28, 1, 1, c('#64748B'));
+    R(3, -28, 1, 1, c('#64748B'));
+    // smile
+    const grin = char.stunTimer > 0 ? 0 : 1;
+    R(0, -23, 3, 1, c('#7A3B2E'));
+    if (grin) R(3, -24, 1, 1, c('#7A3B2E'));
+    ctx.restore();
   }
 
   private drawPixelMustache(

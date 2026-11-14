@@ -153,6 +153,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
                 <div className="bg-slate-900 border-2 border-amber-400/70 p-1">
                   <CharacterPreviewSvg
                     costume={slots[0]?.costume}
+                    heroId={slots[0]?.heroId}
                     size={54}
                   />
                 </div>

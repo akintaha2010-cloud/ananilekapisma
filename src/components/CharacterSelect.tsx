@@ -280,7 +280,7 @@ export const CharacterSelect: React.FC<CharacterSelectProps> = ({
 
               {/* Character Preview + Name */}
               <div className="flex items-center gap-3 bg-slate-950/85 rounded-none p-2.5 border-2 border-slate-800">
-                <CharacterPreviewSvg costume={slot.costume} size={68} />
+                <CharacterPreviewSvg costume={slot.costume} heroId={slot.heroId} size={68} />
                 <div className="flex-1 min-w-0">
                   <label className="block text-[10px] text-slate-400 mb-1">
                     Savaşçı Adı

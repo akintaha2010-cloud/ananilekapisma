@@ -407,6 +407,32 @@ function triggerHeroAbility(char: CharacterEntity, sim: SimulationState) {
       break;
     }
 
+    case 'ship_it': {
+      char.squashX = 1.25;
+      char.squashY = 1.25;
+      char.jiggleAmp = 0.3;
+      char.vy = Math.min(char.vy, -260);
+      char.grounded = false;
+      sim.trauma = Math.min(1, sim.trauma + 0.4);
+      for (const other of sim.players) {
+        if (other.slotIndex === char.slotIndex || !other.alive || isSameTeam(char, other)) continue;
+        const dx = other.x + other.w / 2 - cx;
+        const dy = other.y + other.h / 2 - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 200 && other.invulnTimer <= 0) {
+          const otherWeight = getHeroDef(other.heroId).stats.weightMult;
+          const nx = dist > 1 ? dx / dist : char.facing;
+          other.vx += (nx * 480) / otherWeight;
+          other.vy = -520 / otherWeight;
+          other.grounded = false;
+          other.stunTimer = Math.max(other.stunTimer, 0.45);
+          other.lastHitBy = char.slotIndex;
+          other.lastHitTimer = PHYSICS.KILL_CREDIT_WINDOW;
+        }
+      }
+      break;
+    }
+
     case 'frost_shield': {
       char.shieldTimer = 2.2;
       char.squashX = 1.18;

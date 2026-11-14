@@ -65,7 +65,8 @@ export type HeroId =
   | 'karahan'
   | 'leyla'
   | 'karanlik'
-  | 'altin_hakan';
+  | 'altin_hakan'
+  | 'akin';
 
 export type HeroAbilityKind =
   | 'high_spring'
@@ -75,7 +76,8 @@ export type HeroAbilityKind =
   | 'frost_shield'
   | 'sky_hook'
   | 'shadow_warp'
-  | 'gold_quake';
+  | 'gold_quake'
+  | 'ship_it';
 
 export interface HeroStats {
   speedMult: number;
