@@ -1,3 +1,4 @@
+import { isScrolling, scrollLeader, scrollSpawn, updateScroll } from './scroll';
 import { ADVENTURE_ENEMY_HP, buildAdventureEnemySlot, isAdventureBoss } from './adventure';
 import { getHeroDef } from './characters';
 import {
@@ -60,6 +61,7 @@ export function createSimulation(
     return {
       slotIndex: slot.slotIndex,
       heroId: hero.id,
+      look: slot.look,
       name: slot.name,
       isBot: slot.kind === 'bot',
       aiPersonality: slot.aiPersonality,
@@ -117,6 +119,9 @@ export function createSimulation(
     mode: settings.mode,
     mapId: settings.mapId,
     countdown: 0,
+    worldWidth: ARENA_WIDTH,
+    scrollX: 0,
+    scrollLock: null,
     elapsedSec: 0,
     timeRemainingSec:
       settings.mode === 'time' || settings.mode === 'crown'
@@ -147,8 +152,9 @@ export function createSimulation(
 }
 
 function respawnCharacter(char: CharacterEntity, sim: SimulationState) {
-  const layout = getMapLayout(sim.mapId);
-  const spawn = layout.spawnPoints[char.slotIndex % layout.spawnPoints.length];
+  const spawn = isScrolling(sim)
+    ? scrollSpawn(sim, char)
+    : getMapLayout(sim.mapId).spawnPoints[char.slotIndex % getMapLayout(sim.mapId).spawnPoints.length];
   char.x = spawn.x;
   char.y = Math.max(40, spawn.y - 30);
   char.vx = 0;
@@ -443,7 +449,7 @@ function triggerHeroAbility(char: CharacterEntity, sim: SimulationState) {
     }
 
     case 'sky_hook': {
-      const centerPull = ARENA_WIDTH / 2 - cx;
+      const centerPull = sim.scrollX + ARENA_WIDTH / 2 - cx;
       char.vx = Math.sign(centerPull) * Math.min(380, Math.abs(centerPull) * 0.9);
       char.vy = -785;
       char.grounded = false;
@@ -456,8 +462,8 @@ function triggerHeroAbility(char: CharacterEntity, sim: SimulationState) {
 
     case 'shadow_warp': {
       const targetX = Math.max(
-        60,
-        Math.min(ARENA_WIDTH - 60 - char.w, char.x + char.facing * 155)
+        sim.scrollX + 60,
+        Math.min(sim.scrollX + ARENA_WIDTH - 60 - char.w, char.x + char.facing * 155)
       );
       char.x = targetX;
       char.vy = -240;
@@ -755,8 +761,8 @@ function updateCharacterPhysics(
 
   if (
     char.y > ARENA_HEIGHT + 90 ||
-    char.x + char.w < -110 ||
-    char.x > ARENA_WIDTH + 110
+    char.x + char.w < sim.scrollX - 110 ||
+    char.x > sim.scrollX + ARENA_WIDTH + 110
   ) {
     eliminateCharacter(char, sim);
   }
@@ -957,7 +963,7 @@ function eliminateCharacter(char: CharacterEntity, sim: SimulationState) {
 
   sim.pendingEvents.push({
     type: 'ko',
-    x: Math.max(40, Math.min(ARENA_WIDTH - 40, char.x + char.w / 2)),
+    x: Math.max(sim.scrollX + 40, Math.min(sim.scrollX + ARENA_WIDTH - 40, char.x + char.w / 2)),
     y: Math.min(ARENA_HEIGHT - 20, char.y),
     slotIndex: char.slotIndex,
     victimSlot: killerSlot,
@@ -1167,6 +1173,7 @@ export function stepSimulation(
   resolveCharacterCollisions(sim);
   if (sim.mode === 'crown') updateCrown(sim, dt);
   if (sim.mode === 'adventure') updateAdventure(sim, dt);
+  if (isScrolling(sim)) updateScroll(sim, dt);
   evaluateWinCondition(sim);
 }
 
@@ -1184,11 +1191,12 @@ export function spawnAdventureWave(sim: SimulationState) {
     const kind = wave[i];
     foe.y = -60 - i * 40;
     foe.vy = 0;
-    foe.facing = foe.x > ARENA_WIDTH / 2 ? -1 : 1;
+    if (isScrolling(sim)) foe.x = sim.scrollX + ARENA_WIDTH * 0.55 + i * 110;
+    foe.facing = foe.x > sim.scrollX + ARENA_WIDTH / 2 ? -1 : 1;
     if (isAdventureBoss(kind)) {
       foe.w = Math.round(PHYSICS.CHAR_WIDTH * 1.5);
       foe.h = Math.round(PHYSICS.CHAR_HEIGHT * 1.5);
-      foe.x = ARENA_WIDTH / 2 - foe.w / 2;
+      foe.x = sim.scrollX + ARENA_WIDTH * (isScrolling(sim) ? 0.7 : 0.5) - foe.w / 2;
       adv.bossSlot = foe.slotIndex;
       adv.bossName = foe.name;
       adv.bossMaxHp = ADVENTURE_ENEMY_HP[kind];
@@ -1210,7 +1218,15 @@ function updateAdventure(sim: SimulationState, dt: number) {
   const adv = sim.adventure;
   if (!adv) return;
   const foesLeft = sim.players.some((p) => p.team === 'B' && !p.eliminated);
+  if (!foesLeft) sim.scrollLock = null;
   if (foesLeft || adv.waveIdx >= adv.waves.length) return;
+  const trigger = adv.triggers?.[adv.waveIdx];
+  if (trigger !== undefined) {
+    const lead = scrollLeader(sim);
+    if (lead === null || lead < trigger) return;
+    sim.scrollLock = Math.min(sim.worldWidth - ARENA_WIDTH, trigger - ARENA_WIDTH * 0.4);
+    if (Math.abs(sim.scrollX - sim.scrollLock) > 8) return;
+  }
   adv.waveDelay -= dt;
   if (adv.waveDelay <= 0) {
     adv.waveDelay = 1.4;
@@ -1301,6 +1317,7 @@ export function buildHudSnapshot(sim: SimulationState): HudSnapshot {
     players: sim.players.filter((p) => isHudVisible(sim, p)).map((p) => ({
       slotIndex: p.slotIndex,
       heroId: p.heroId,
+      look: p.look,
       name: p.name,
       isBot: p.isBot,
       team: p.team,
@@ -1350,6 +1367,7 @@ export function buildRoundResult(sim: SimulationState): RoundResult {
     standings: ranked.filter((p) => isHudVisible(sim, p)).map((p) => ({
       slotIndex: p.slotIndex,
       heroId: p.heroId,
+      look: p.look,
       name: p.name,
       isBot: p.isBot,
       team: p.team,

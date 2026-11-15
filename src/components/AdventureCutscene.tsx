@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CostumeConfig, HeroId } from '../game/types';
+import { CostumeConfig, HeroId, HumanLookId } from '../game/types';
 import { CutsceneLine, CutsceneSpeaker, HAVEN_CAST, ORFE_COSTUME, PASA_COSTUME } from '../game/adventure';
 import { CharacterPreviewSvg } from './CharacterPreviewSvg';
 
@@ -12,7 +12,7 @@ interface AdventureCutsceneProps {
   onDone: () => void;
 }
 
-type Actor = { name: string; costume: CostumeConfig; side: 'left' | 'right'; heroId?: HeroId };
+type Actor = { name: string; costume: CostumeConfig; side: 'left' | 'right'; heroId?: HeroId; look?: HumanLookId };
 const BIG = new Set<CutsceneSpeaker>(['pasa', 'mert', 'tuna', 'ayaz', 'gokoz', 'buglord']);
 const cast = (k: keyof typeof HAVEN_CAST, side: 'left' | 'right'): Actor => ({ ...HAVEN_CAST[k], side });
 
@@ -92,7 +92,7 @@ export const AdventureCutscene: React.FC<AdventureCutsceneProps> = ({ title, lin
   const actors = new Map<CutsceneSpeaker, Actor>();
   for (const l of lines) {
     if (actors.has(l.speaker) || l.speaker === 'npc') continue;
-    actors.set(l.speaker, l.speaker === 'hero' ? { name: heroName, costume: heroCostume, side: 'left', heroId } : SPEAKERS[l.speaker]);
+    actors.set(l.speaker, l.speaker === 'hero' ? { name: heroName, costume: heroCostume, side: 'left', heroId, look: heroId === 'akin' && heroName === 'Akın' ? 'akin' : undefined } : SPEAKERS[l.speaker]);
   }
   const narrator = line.speaker === 'npc';
   const speaker: Actor = narrator ? { name: '', costume: heroCostume, side: 'left' } : actors.get(line.speaker)!;
@@ -107,7 +107,7 @@ export const AdventureCutscene: React.FC<AdventureCutsceneProps> = ({ title, lin
         className={`flex flex-col items-center transition-all duration-300 ${active ? 'opacity-100 -translate-y-3 scale-110' : 'opacity-45 scale-95'}`}
         style={{ transform: c.side === 'right' ? 'scaleX(-1)' : undefined }}
       >
-        <CharacterPreviewSvg costume={c.costume} heroId={c.heroId} size={BIG.has(key) ? 190 : 150} celebrating={active && !typing} />
+        <CharacterPreviewSvg costume={c.costume} heroId={c.heroId} look={c.look} size={BIG.has(key) ? 190 : 150} celebrating={active && !typing} />
       </div>
     );
   };

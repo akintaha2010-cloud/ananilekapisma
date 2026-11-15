@@ -117,7 +117,11 @@ export interface PlayerSlotConfig {
   aiPersonality: AiPersonality;
   heroId?: HeroId;
   costume: CostumeConfig;
+  look?: HumanLookId;
 }
+
+export type HumanLookId = 'akin' | 'devin' | 'ozgur' | 'mert' | 'tuna' | 'ayaz' | 'gokoz' | 'buglord' | 'bug';
+export type ScrollTheme = 'cankaya' | 'kizilay' | 'tunali' | 'frost' | 'glitch' | 'tower';
 
 export interface AudioSettings {
   musicVolume: number; // 0..1
@@ -198,6 +202,7 @@ export interface PlayerInputState {
 export interface CharacterEntity {
   slotIndex: number;
   heroId: HeroId;
+  look?: HumanLookId;
   name: string;
   isBot: boolean;
   aiPersonality: AiPersonality;
@@ -288,6 +293,7 @@ export interface AdventureState {
   bossSlot: number | null;
   bossName?: string;
   bossMaxHp?: number;
+  triggers?: number[];
   nextSlot: number;
   victoryText: string;
   hp: Record<number, number>;
@@ -308,6 +314,10 @@ export interface SimulationState {
   mode: GameModeId;
   mapId: MapId;
   countdown: number;
+  worldWidth: number;
+  scrollX: number;
+  scrollLock: number | null;
+  scrollTheme?: ScrollTheme;
   elapsedSec: number;
   timeRemainingSec: number;
   hitstopTimer: number;
@@ -336,6 +346,7 @@ export interface SimulationState {
 export interface HudPlayerSummary {
   slotIndex: number;
   heroId: HeroId;
+  look?: HumanLookId;
   name: string;
   isBot: boolean;
   team: TeamId;
@@ -438,12 +449,14 @@ export interface SagaLevelDef {
   rivals: {
     name: string;
     heroId: HeroId;
+    look?: HumanLookId;
     aiPersonality: AiPersonality;
     costume: CostumeConfig;
   }[];
   ally?: {
     name: string;
     heroId: HeroId;
+    look?: HumanLookId;
     aiPersonality: AiPersonality;
     costume: CostumeConfig;
   };

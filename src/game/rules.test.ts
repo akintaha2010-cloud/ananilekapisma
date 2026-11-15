@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { DEFAULT_SETTINGS, DEFAULT_SLOTS } from './constants';
 import { createSimulation, stepSimulation, buildRoundResult, spawnAdventureWave, buildHudSnapshot } from './physics';
 import { computeBotInput } from './ai';
+import { applyScrollLevel, buildScrollLevel } from './scroll';
 import { evaluateLiveAchievements, evaluateRoundEndAchievements } from './achievements';
 import { computeLevelFromXp } from './characters';
 import { computeSagaStarsEarned } from './saga';
@@ -413,10 +414,16 @@ test('adventure mode: enemy waves drop in one after another and the chapter reso
     );
     const sim = createSimulation(settings, allies);
     sim.adventure = createAdventureState(chapter);
+    if (chapter.scroll) applyScrollLevel(sim, buildScrollLevel(chapter.waves.length, chapter.id), chapter.scroll);
     let steps = 0;
-    while (!sim.finished && steps < 60 * 240) {
+    while (!sim.finished && steps < 60 * 420) {
       const inputs: Record<number, PlayerInputState> = {};
       for (const p of sim.players) inputs[p.slotIndex] = computeBotInput(p, sim, 1 / 60);
+      const lead = sim.players.find((p) => p.team === 'A' && !p.isBot);
+      if (chapter.scroll && lead && !sim.players.some((p) => p.team === 'B' && p.alive && !p.eliminated)) {
+        const t = Math.floor(steps / 20) % 3;
+        inputs[lead.slotIndex] = { ...inputs[lead.slotIndex], left: false, right: true, jumpPressed: t === 0, upHeld: t !== 2, down: false };
+      }
       stepSimulation(sim, inputs, 1 / 60);
       steps++;
     }

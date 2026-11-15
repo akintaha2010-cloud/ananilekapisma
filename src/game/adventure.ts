@@ -1,6 +1,8 @@
 import {
   AdventureEnemyKind,
   HeroId,
+  HumanLookId,
+  ScrollTheme,
   AdventureState,
   CostumeConfig,
   HazardPhase,
@@ -41,6 +43,7 @@ export interface AdventureChapter {
   ally: boolean;
   campaign?: AdventureCampaign;
   allies?: StoryAllyId[];
+  scroll?: ScrollTheme;
   waves: AdventureEnemyKind[][];
   intro: CutsceneLine[];
   outro: CutsceneLine[];
@@ -62,14 +65,14 @@ export const PASA_COSTUME: CostumeConfig = {
 };
 
 export const HAVEN_CAST = {
-  devin: { name: 'Devin', heroId: 'zeynep' as HeroId, costume: { colorId: 'turquoise', fesStyle: 'denizci_bere', mustacheStyle: 'cember', accessoryId: 'kanat' } as CostumeConfig },
-  ozgur: { name: 'Prenses Özgür', heroId: 'leyla' as HeroId, costume: { colorId: 'plum', fesStyle: 'sultan_taci', mustacheStyle: 'kaytan', accessoryId: 'pelerin' } as CostumeConfig },
-  mert: { name: 'Mert', heroId: 'tiknaz' as HeroId, costume: { colorId: 'crimson', fesStyle: 'altin_migfer', mustacheStyle: 'pala', accessoryId: 'kalkan' } as CostumeConfig },
-  tuna: { name: 'Tuna', heroId: 'kizil_bey' as HeroId, costume: { colorId: 'tangerine', fesStyle: 'saray_kavuk', mustacheStyle: 'burgu', accessoryId: 'pelerin' } as CostumeConfig },
-  ayaz: { name: 'Ankara Ayazı', heroId: 'karahan' as HeroId, costume: { colorId: 'turquoise', fesStyle: 'altin_migfer', mustacheStyle: 'cember', accessoryId: 'hale' } as CostumeConfig },
-  gokoz: { name: 'Gököz', heroId: 'karanlik' as HeroId, costume: { colorId: 'cobalt', fesStyle: 'yeniceri_bork', mustacheStyle: 'sultan_sakal', accessoryId: 'hale' } as CostumeConfig },
-  buglord: { name: 'Bug Lord', heroId: 'altin_hakan' as HeroId, costume: { colorId: 'shadow_obsidian', fesStyle: 'sultan_taci', mustacheStyle: 'sultan_sakal', accessoryId: 'kanat' } as CostumeConfig },
-  bug: { name: 'Bug', heroId: 'karanlik' as HeroId, costume: { colorId: 'emerald', fesStyle: 'klasik_fes', mustacheStyle: 'kaytan', accessoryId: 'gozluk' } as CostumeConfig },
+  devin: { look: 'devin' as HumanLookId, name: 'Devin', heroId: 'zeynep' as HeroId, costume: { colorId: 'turquoise', fesStyle: 'denizci_bere', mustacheStyle: 'cember', accessoryId: 'kanat' } as CostumeConfig },
+  ozgur: { look: 'ozgur' as HumanLookId, name: 'Prenses Özgür', heroId: 'leyla' as HeroId, costume: { colorId: 'plum', fesStyle: 'sultan_taci', mustacheStyle: 'kaytan', accessoryId: 'pelerin' } as CostumeConfig },
+  mert: { look: 'mert' as HumanLookId, name: 'Mert', heroId: 'tiknaz' as HeroId, costume: { colorId: 'crimson', fesStyle: 'altin_migfer', mustacheStyle: 'pala', accessoryId: 'kalkan' } as CostumeConfig },
+  tuna: { look: 'tuna' as HumanLookId, name: 'Tuna', heroId: 'kizil_bey' as HeroId, costume: { colorId: 'tangerine', fesStyle: 'saray_kavuk', mustacheStyle: 'burgu', accessoryId: 'pelerin' } as CostumeConfig },
+  ayaz: { look: 'ayaz' as HumanLookId, name: 'Ankara Ayazı', heroId: 'karahan' as HeroId, costume: { colorId: 'turquoise', fesStyle: 'altin_migfer', mustacheStyle: 'cember', accessoryId: 'hale' } as CostumeConfig },
+  gokoz: { look: 'gokoz' as HumanLookId, name: 'Gököz', heroId: 'karanlik' as HeroId, costume: { colorId: 'cobalt', fesStyle: 'yeniceri_bork', mustacheStyle: 'sultan_sakal', accessoryId: 'hale' } as CostumeConfig },
+  buglord: { look: 'buglord' as HumanLookId, name: 'Bug Lord', heroId: 'altin_hakan' as HeroId, costume: { colorId: 'shadow_obsidian', fesStyle: 'sultan_taci', mustacheStyle: 'sultan_sakal', accessoryId: 'kanat' } as CostumeConfig },
+  bug: { look: 'bug' as HumanLookId, name: 'Bug', heroId: 'karanlik' as HeroId, costume: { colorId: 'emerald', fesStyle: 'klasik_fes', mustacheStyle: 'kaytan', accessoryId: 'gozluk' } as CostumeConfig },
 };
 
 export const ADVENTURE_ENEMY_HP: Record<AdventureEnemyKind, number> = {
@@ -92,6 +95,7 @@ export function isAdventureBoss(kind: AdventureEnemyKind): boolean {
 }
 
 const havenFoe = (key: keyof typeof HAVEN_CAST, aiPersonality: PlayerSlotConfig['aiPersonality']) => ({
+  look: HAVEN_CAST[key].look,
   name: HAVEN_CAST[key].name,
   heroId: HAVEN_CAST[key].heroId,
   aiPersonality,
@@ -164,13 +168,14 @@ export function buildAdventureAllySlots(slots: PlayerSlotConfig[], chapter: Adve
 function buildHavenAllySlots(slots: PlayerSlotConfig[], chapter: AdventureChapter): PlayerSlotConfig[] {
   const humans = slots.filter((s) => s.kind === 'human').map((s) => ({ ...s, team: 'A' as const }));
   if (humans.length === 0) humans.push({ ...slots[0], kind: 'human', team: 'A' });
-  humans[0] = { ...humans[0], name: 'Akın', heroId: 'akin' };
+  humans[0] = { ...humans[0], name: 'Akın', heroId: 'akin', look: 'akin' };
   const allies: PlayerSlotConfig[] = [...humans];
   for (const id of chapter.allies ?? []) {
     if (allies.length >= 4) break;
     const used = new Set(allies.map((s) => s.slotIndex));
     const free = [0, 1, 2, 3].find((i) => !used.has(i)) ?? 3;
-    const cast = id === 'orfe' ? { name: 'Orfe', heroId: 'leyla' as HeroId, costume: ORFE_COSTUME } : HAVEN_CAST[id];
+    const cast: { name: string; heroId: HeroId; costume: CostumeConfig; look?: HumanLookId } =
+      id === 'orfe' ? { name: 'Orfe', heroId: 'leyla', costume: ORFE_COSTUME } : HAVEN_CAST[id];
     allies.push({
       slotIndex: free,
       kind: 'bot',
@@ -178,6 +183,7 @@ function buildHavenAllySlots(slots: PlayerSlotConfig[], chapter: AdventureChapte
       team: 'A',
       aiPersonality: 'balanced',
       heroId: cast.heroId,
+      look: cast.look,
       costume: { ...cast.costume },
     });
   }
@@ -298,6 +304,7 @@ export const ADVENTURE_CHAPTERS: AdventureChapter[] = [
   {
     id: 101,
     campaign: 'haven',
+    scroll: 'cankaya',
     title: '1. Haven Başlıyor',
     subtitle: 'Çankaya Gençlik Merkezi',
     mapId: 'story_origin',
@@ -322,6 +329,7 @@ export const ADVENTURE_CHAPTERS: AdventureChapter[] = [
   {
     id: 102,
     campaign: 'haven',
+    scroll: 'kizilay',
     title: '2. Kızılay Kaosu',
     subtitle: 'Mert: The Deadline Destroyer',
     mapId: 'story_crimson',
@@ -346,6 +354,7 @@ export const ADVENTURE_CHAPTERS: AdventureChapter[] = [
   {
     id: 103,
     campaign: 'haven',
+    scroll: 'tunali',
     title: '3. Döner Savaşları',
     subtitle: 'Tuna: The Döner King',
     mapId: 'story_golden',
@@ -369,6 +378,7 @@ export const ADVENTURE_CHAPTERS: AdventureChapter[] = [
   {
     id: 104,
     campaign: 'haven',
+    scroll: 'frost',
     title: '4. Ankara Ayazı',
     subtitle: 'Buzlu Sokaklar ve EGO 404',
     mapId: 'story_frost',
@@ -394,6 +404,7 @@ export const ADVENTURE_CHAPTERS: AdventureChapter[] = [
   {
     id: 105,
     campaign: 'haven',
+    scroll: 'glitch',
     title: '5. Glitch Kalesi',
     subtitle: 'Gököz: The Glitch Master',
     mapId: 'story_lost',
@@ -417,6 +428,7 @@ export const ADVENTURE_CHAPTERS: AdventureChapter[] = [
   {
     id: 106,
     campaign: 'haven',
+    scroll: 'tower',
     title: '6. Prensesi Kurtar!',
     subtitle: 'Haven\'ın Gizli Kulesi',
     mapId: 'story_tournament',

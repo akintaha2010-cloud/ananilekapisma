@@ -1,4 +1,6 @@
 import { MASCOT_EARS, MASCOT_QUILLS } from './mascot';
+import { humanRects } from './looks';
+import { drawAnkaraBackdrop } from './backdrop';
 import {
   ARENA_HEIGHT,
   ARENA_WIDTH,
@@ -428,7 +430,7 @@ export class CastleRenderer {
     let maxY = -Infinity;
     for (const p of sim.players) {
       if (!p.alive || p.eliminated) continue;
-      const cx = (p.x + p.w / 2) * k;
+      const cx = (p.x + p.w / 2 - sim.scrollX) * k;
       const cy = (p.y + p.h / 2) * k;
       const w = p.isBot ? 1 : 2.5;
       sx += cx * w;
@@ -481,6 +483,10 @@ export class CastleRenderer {
     this.updateCamera(sim, timeSec, attractMode);
 
     // 1. Far sky layer scrolls slower than the castle (parallax depth), castle stays fixed to the gameplay grid
+    const scrollPx = Math.round(sim.scrollX * PSCALE);
+    if (sim.scrollTheme && sim.worldWidth > ARENA_WIDTH) {
+      drawAnkaraBackdrop(pctx, sim.scrollTheme, scrollPx, timeSec, PW);
+    } else {
     const bg = this.ensureStaticBackground(sim.mapId);
     const parX = Math.round((this.camX - PW / 2) * 0.3);
     const parY = Math.round((this.camY - PH / 2) * 0.15);
@@ -498,9 +504,14 @@ export class CastleRenderer {
     if (sim.windForce !== 0) {
       this.drawPixelWindStreaks(pctx, sim.windForce, timeSec);
     }
+    }
+
+    pctx.save();
+    pctx.translate(-scrollPx, 0);
 
     // 4. Pixel platforms
     for (const plat of sim.platforms) {
+      if (plat.x + plat.w < sim.scrollX - 20 || plat.x > sim.scrollX + ARENA_WIDTH + 20) continue;
       this.drawPixelPlatform(pctx, plat, sim.hazardPhase === 'slippery', timeSec);
     }
 
@@ -522,6 +533,7 @@ export class CastleRenderer {
     // 7. Pooled pixel particles + floating score popups
     this.drawPixelParticles(pctx);
     this.drawFloatingPopups(pctx);
+    pctx.restore();
 
     // 8. Pixel Bosphorus moat along bottom of pixel buffer
     this.drawPixelMoat(pctx, timeSec);
@@ -1201,8 +1213,9 @@ export class CastleRenderer {
     const limbSpread = Math.round(flattenFactor * 7);
     const acc = char.costume.accessoryId ?? 'yok';
 
-    const isAkin = char.heroId === 'akin';
-    if (isAkin) this.drawPixelAkin(ctx, char, timeSec, flash, walkStep, isPancaked);
+    const isAkin = char.heroId === 'akin' || !!char.look;
+    if (char.look) this.drawPixelHuman(ctx, char, timeSec, flash, walkStep, isPancaked);
+    else if (isAkin) this.drawPixelAkin(ctx, char, timeSec, flash, walkStep, isPancaked);
     if (!isAkin) {
     // 0. Back Accessories (Pelerin / Kalkan / Kanat)
     if (acc === 'pelerin') {
@@ -1503,6 +1516,32 @@ export class CastleRenderer {
         ctx.fillRect(cx - 1, tagY + 8, 2, 2);
       }
     }
+  }
+
+  private drawPixelHuman(
+    ctx: CanvasRenderingContext2D,
+    char: CharacterEntity,
+    timeSec: number,
+    flash: boolean,
+    walkStep: number,
+    isPancaked: boolean
+  ) {
+    if (!char.look) return;
+    ctx.save();
+    if (char.facing < 0) ctx.scale(-1, 1);
+    if (isPancaked) ctx.scale(1.3, 0.45);
+    const rects = humanRects(char.look, {
+      walkStep,
+      air: !char.grounded,
+      t: timeSec,
+      stunned: char.stunTimer > 0,
+      phase: char.slotIndex,
+    });
+    for (const [x, y, w, h, col] of rects) {
+      ctx.fillStyle = flash ? '#FFFFFF' : col;
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.restore();
   }
 
   private drawPixelAkin(

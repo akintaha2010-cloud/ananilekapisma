@@ -21,6 +21,7 @@ import {
   loadAdventureProgress,
   saveAdventureProgress,
 } from './game/adventure';
+import { applyScrollLevel, buildScrollLevel } from './game/scroll';
 import { AdventureCutscene } from './components/AdventureCutscene';
 import { soundEngine } from './game/audio';
 import {
@@ -730,6 +731,7 @@ export default function App() {
       };
       freshSim = createSimulation(advSettings, buildAdventureAllySlots(slotsRef.current, ch));
       freshSim.adventure = createAdventureState(ch);
+      if (ch.scroll) applyScrollLevel(freshSim, buildScrollLevel(ch.waves.length, ch.id), ch.scroll);
       if (ch.hazard) freshSim.hazardPhase = ch.hazard;
     } else {
       freshSim = createSimulation(settingsRef.current, slotsRef.current);

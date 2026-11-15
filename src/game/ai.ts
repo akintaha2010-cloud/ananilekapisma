@@ -153,7 +153,7 @@ function computeRawBotInput(
     floorLookahead === null &&
     Math.abs(bot.vx) > 65;
 
-  if (isOverAbyss || isFallingLow || cx < 115 || cx > ARENA_WIDTH - 115) {
+  if (isOverAbyss || isFallingLow || (sim.worldWidth <= ARENA_WIDTH && (cx < 115 || cx > ARENA_WIDTH - 115))) {
     const safePlat = findNearestSafePlatform(cx, cy, sim.platforms);
     if (safePlat) {
       const targetX = Math.max(
@@ -212,7 +212,7 @@ function computeRawBotInput(
   if (standingPlat && standingPlat.type === 'crumbling' && standingPlat.crumbleState === 'shaking') {
     input.jumpPressed = true;
     input.upHeld = true;
-    if (cx < ARENA_WIDTH / 2) input.right = true;
+    if (cx < sim.scrollX + ARENA_WIDTH / 2) input.right = true;
     else input.left = true;
     return input;
   }
@@ -229,9 +229,23 @@ function computeRawBotInput(
       (!isTeamMode || p.team !== bot.team)
   );
 
+  if (enemies.length === 0 && sim.worldWidth > ARENA_WIDTH && bot.team === 'A') {
+    const lead = sim.players.filter((p) => p.team === 'A' && !p.isBot && p.alive && !p.eliminated)[0];
+    const goal = lead ? lead.x + lead.w / 2 - 90 - (bot.slotIndex % 3) * 40 : sim.scrollX + ARENA_WIDTH * 0.6;
+    if (cx < goal - 30) input.right = true;
+    else if (cx > goal + 30) input.left = true;
+    const dir = input.right ? 1 : input.left ? -1 : 0;
+    if (dir !== 0 && bot.grounded && (findPlatformUnder(cx + dir * 70, footY, sim.platforms) === null || (lead && lead.y + lead.h < footY - 40))) {
+      input.jumpPressed = true;
+      input.upHeld = true;
+    }
+    if (!bot.grounded && bot.vy < 0) input.upHeld = true;
+    return input;
+  }
+
   if (enemies.length === 0) {
-    if (cx < ARENA_WIDTH / 2 - 40) input.right = true;
-    else if (cx > ARENA_WIDTH / 2 + 40) input.left = true;
+    if (cx < sim.scrollX + ARENA_WIDTH / 2 - 40) input.right = true;
+    else if (cx > sim.scrollX + ARENA_WIDTH / 2 + 40) input.left = true;
     return input;
   }
 
@@ -279,7 +293,7 @@ function computeRawBotInput(
     if (canAbility && (hero.abilityKind === 'frost_shield' || hero.abilityKind === 'flame_burst' || hero.abilityKind === 'belly_dash')) {
       input.abilityPressed = true;
     }
-    if (cx < ARENA_WIDTH / 2) input.right = true;
+    if (cx < sim.scrollX + ARENA_WIDTH / 2) input.right = true;
     else input.left = true;
     if (bot.grounded && bot.aiPersonality !== 'defensive') {
       input.jumpPressed = true;
@@ -382,7 +396,7 @@ function computeRawBotInput(
         }
       } else {
         if (bot.aiDecisionTimer <= 0) {
-          bot.aiWanderDir = cx > ARENA_WIDTH / 2 ? -1 : 1;
+          bot.aiWanderDir = cx > sim.scrollX + ARENA_WIDTH / 2 ? -1 : 1;
           bot.aiDecisionTimer = 1.0;
         }
         if (bot.aiWanderDir > 0) input.right = true;

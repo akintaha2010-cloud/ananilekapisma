@@ -1,11 +1,13 @@
 import { MASCOT_EARS, MASCOT_QUILLS } from '../game/mascot';
 import React from 'react';
 import { CHARACTER_COLORS } from '../game/constants';
-import { CostumeConfig, HeroId } from '../game/types';
+import { CostumeConfig, HeroId, HumanLookId } from '../game/types';
+import { humanRects } from '../game/looks';
 
 interface CharacterPreviewSvgProps {
   costume: CostumeConfig;
   heroId?: HeroId;
+  look?: HumanLookId;
   size?: number;
   celebrating?: boolean;
   className?: string;
@@ -56,11 +58,24 @@ const AKIN_RECTS: [number, number, number, number, string][] = [
 export const CharacterPreviewSvg: React.FC<CharacterPreviewSvgProps> = ({
   costume,
   heroId,
+  look,
   size = 84,
   celebrating = false,
   className = '',
 }) => {
   const theme = CHARACTER_COLORS[costume.colorId];
+
+  if (look) {
+    return (
+      <svg width={size} height={size} viewBox="-21 -46 42 50" shapeRendering="crispEdges" className={className} aria-hidden="true">
+        <g className={celebrating ? 'animate-bounce' : ''}>
+          {humanRects(look, { walkStep: 0, air: false, t: 0 }).map(([x, y, w, h, fill], i) => (
+            <rect key={i} x={x} y={y} width={w} height={h} fill={fill} />
+          ))}
+        </g>
+      </svg>
+    );
+  }
 
   if (heroId === 'akin') {
     return (

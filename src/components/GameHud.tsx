@@ -58,7 +58,7 @@ const PlayerChip: React.FC<{ p: HudPlayerSummary; showLives: boolean; mirrored: 
         title={abReady ? 'Güç hazır' : undefined}
       >
         <div className="kk-avatar-in">
-          <CharacterPreviewSvg costume={p.costume} heroId={p.heroId} size={34} />
+          <CharacterPreviewSvg costume={p.costume} look={p.look} heroId={p.heroId} size={34} />
         </div>
         {p.shielded && <Shield className="kk-shield" />}
       </div>

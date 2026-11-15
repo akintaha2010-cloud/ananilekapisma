@@ -61,7 +61,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
         {winner && (
           <div className="kk-hero-card" style={{ animation: 'none' }}>
-            <CharacterPreviewSvg costume={winner.costume} heroId={winner.heroId} size={120} celebrating />
+            <CharacterPreviewSvg costume={winner.costume} look={winner.look} heroId={winner.heroId} size={120} celebrating />
           </div>
         )}
 
