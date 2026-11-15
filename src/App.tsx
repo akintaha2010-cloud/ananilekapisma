@@ -39,7 +39,7 @@ import {
   formatKeyCode,
 } from './game/constants';
 import { InputHub } from './game/input';
-import { applyNetSnapshot, NetSnapshot, OnlineClient } from './game/net';
+import { applyNetSnapshot, NetSnapshot, OnlineClient, smoothNetState } from './game/net';
 import {
   buildHudSnapshot,
   buildRoundResult,
@@ -321,6 +321,7 @@ export default function App() {
   const [onlinePeerId, setOnlinePeerId] = useState<string | null>(null);
   const [onlineError, setOnlineError] = useState<string | null>(null);
   const [onlineHasTurn, setOnlineHasTurn] = useState(false);
+  const [onlineJoining, setOnlineJoining] = useState(Boolean(urlRoomParam.current));
 
   const onlineClientRef = useRef<OnlineClient | null>(null);
   const onlineRoomRef = useRef<OnlineRoomState | null>(null);
@@ -505,10 +506,13 @@ export default function App() {
       }
 
       // Compute Saga Stars & Progression XP
+      const mySlot = isOnlineMatchRef.current
+        ? onlineRoomRef.current?.peers.find((p) => p.peerId === onlinePeerIdRef.current)?.slotIndex ?? 0
+        : 0;
       const p1Standing =
-        rawResult.standings.find((s) => s.slotIndex === 0) ?? rawResult.standings[0];
+        rawResult.standings.find((s) => s.slotIndex === mySlot) ?? rawResult.standings[0];
       const p1Won =
-        rawResult.winnerSlot === 0 ||
+        rawResult.winnerSlot === mySlot ||
         Boolean(rawResult.storyWon) ||
         Boolean(rawResult.sagaWon);
 
@@ -620,6 +624,18 @@ export default function App() {
         setOnlineRoom(room);
         setOnlinePeerId(myPeerId);
         setOnlineHasTurn(client.hasTurnConfigured());
+        // Room gone while a match is on (host left, connection lost): back to the lobby, which shows the error.
+        if (!room && isOnlineMatchRef.current) {
+          isOnlineMatchRef.current = false;
+          soundEngine.stopMusic();
+          inputHubRef.current?.clearAll();
+          rendererRef.current?.resetParticles();
+          setRoundResult(null);
+          setMenuSubView('online');
+          screenStateRef.current = 'title';
+          document.body.dataset.state = 'title';
+          setScreenState('title');
+        }
       },
       onError: (message) => {
         setOnlineError(message);
@@ -630,7 +646,20 @@ export default function App() {
         beginOnlineMatch(room);
       },
       onGuestInput: (slotIndex, input) => {
-        guestInputsRef.current[slotIndex] = input;
+        // Keep one-frame edges (jump/ability) until the host's next step has consumed them.
+        const prev = guestInputsRef.current[slotIndex];
+        guestInputsRef.current[slotIndex] = prev
+          ? {
+              ...input,
+              jumpPressed: input.jumpPressed || prev.jumpPressed,
+              abilityPressed: input.abilityPressed || prev.abilityPressed,
+            }
+          : input;
+      },
+      onGuestLeft: (slotIndex) => {
+        // A player who left mid-match is taken over by a bot instead of standing idle.
+        const p = simRef.current.players.find((pl) => pl.slotIndex === slotIndex);
+        if (p && isOnlineMatchRef.current) p.isBot = true;
       },
       onSnapshotReceived: (snap: NetSnapshot) => {
         if (!isOnlineMatchRef.current || client.isHost()) return;
@@ -658,7 +687,8 @@ export default function App() {
           setOnlineError(
             err instanceof Error ? err.message : 'Odaya katılınamadı.'
           );
-        });
+        })
+        .finally(() => setOnlineJoining(false));
     }
 
     return () => {
@@ -1080,7 +1110,8 @@ export default function App() {
             true
           );
         }
-      } else if (state === 'playing') {
+      } else if (state === 'playing' || (state === 'paused' && isOnlineMatchRef.current)) {
+        // Online, the pause menu is only an overlay: the shared match keeps running underneath.
         const sim = simRef.current;
         const isOnline = isOnlineMatchRef.current;
         const client = onlineClientRef.current;
@@ -1088,9 +1119,14 @@ export default function App() {
         const myPeerId = onlinePeerIdRef.current;
         const isGuest = isOnline && Boolean(client && !client.isHost());
         const controls = settingsRef.current.controls;
+        renderer.localSlot =
+          isOnline && room && myPeerId
+            ? room.peers.find((p) => p.peerId === myPeerId)?.slotIndex ?? null
+            : null;
 
         if (isGuest && client && room && myPeerId) {
           // Guest sends local player input to Host & renders latest snapshot
+          smoothNetState(sim, dt);
           const me = room.peers.find((p) => p.peerId === myPeerId);
           if (me) {
             const myInput = inputHub.readPlayerInput(0, true, controls);
@@ -1285,6 +1321,7 @@ export default function App() {
           onlinePeerId={onlinePeerId}
           onlineError={onlineError}
           onlineHasTurn={onlineHasTurn}
+          onlineJoining={onlineJoining}
           initialRoomCode={urlRoomParam.current}
           onSetSubView={(v) => {
             soundEngine.unlock();
@@ -1395,6 +1432,11 @@ export default function App() {
         <VictoryModal
           result={roundResult}
           isOnlineGuest={isOnlineGuest}
+          myTeam={
+            isOnlineMatchRef.current
+              ? ((onlineRoom?.peers.find((p) => p.peerId === onlinePeerId)?.slotIndex ?? 0) % 2 === 0 ? 'A' : 'B')
+              : 'A'
+          }
           onContinueStory={
             roundResult.storyWon
               ? handleContinueStory

@@ -39,6 +39,7 @@ interface OnlineLobbyModalProps {
   myPeerId: string | null;
   onlineError: string | null;
   hasTurn: boolean;
+  joining: boolean;
   initialRoomCode: string;
   defaultName: string;
   defaultCostume: CostumeConfig;
@@ -88,6 +89,7 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
   myPeerId,
   onlineError,
   hasTurn,
+  joining,
   initialRoomCode,
   defaultName,
   defaultCostume,
@@ -105,7 +107,8 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
   const [playerName, setPlayerName] = useState(defaultName || 'Osman');
   const [costume, setCostume] = useState<CostumeConfig>(defaultCostume);
   const [joinCode, setJoinCode] = useState(initialRoomCode);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'create' | 'join' | null>(null);
+  const connecting = Boolean(busy) || joining;
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -133,11 +136,11 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
 
   const handleCreate = async () => {
     onClearError();
-    setBusy(true);
+    setBusy('create');
     try {
       await onCreateRoom(playerName.trim() || 'Osman', costume);
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -145,11 +148,11 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
     e.preventDefault();
     if (!joinCode.trim()) return;
     onClearError();
-    setBusy(true);
+    setBusy('join');
     try {
       await onJoinRoom(joinCode.trim().toUpperCase(), playerName.trim() || 'Misafir', costume);
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -250,7 +253,7 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  maxLength={14}
+                  maxLength={12}
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
                   className="w-full bg-slate-900 border-2 border-slate-700 px-2.5 py-1.5 text-sm font-display font-bold text-white focus:outline-none focus:border-amber-400"
@@ -321,13 +324,13 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
               </p>
               <button
                 type="button"
-                disabled={busy}
+                disabled={connecting}
                 onClick={handleCreate}
                 data-testid="create-room-btn"
                 className="mt-4 w-full py-3 px-5 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 border-2 border-amber-200 text-slate-950 font-display font-bold text-base inline-flex items-center justify-center gap-2 cursor-pointer pixel-btn"
               >
-                {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
-                Özel Oda Oluştur
+                {busy === 'create' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                {busy === 'create' ? 'Oda Açılıyor...' : 'Özel Oda Oluştur'}
               </button>
             </div>
 
@@ -344,20 +347,20 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
               <div className="mt-3 flex gap-2.5">
                 <input
                   type="text"
-                  maxLength={8}
+                  maxLength={6}
                   placeholder="Örn: KALE7X"
                   value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  onChange={(e) => setJoinCode(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase())}
                   data-testid="join-room-input"
                   className="flex-1 bg-slate-950 border-2 border-slate-700 px-3 py-2.5 text-base font-display font-bold tracking-widest text-amber-200 uppercase focus:outline-none focus:border-sky-400"
                 />
                 <button
                   type="submit"
-                  disabled={busy || joinCode.trim().length < 3}
+                  disabled={connecting || joinCode.trim().length !== 6}
                   data-testid="join-room-btn"
                   className="px-5 py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-50 border-2 border-sky-200 text-slate-950 font-display font-bold text-sm cursor-pointer pixel-btn"
                 >
-                  Odaya Katıl
+                  {busy === 'join' || joining ? 'Bağlanıyor...' : 'Odaya Katıl'}
                 </button>
               </div>
             </form>
@@ -551,7 +554,7 @@ export const OnlineLobbyModal: React.FC<OnlineLobbyModalProps> = ({
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    maxLength={14}
+                    maxLength={12}
                     value={playerName}
                     onChange={(e) => setPlayerName(e.target.value)}
                     onBlur={handleNameBlur}

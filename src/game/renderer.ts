@@ -24,6 +24,8 @@ const PIXEL_FONT_3X5: Record<string, string[]> = {
   O: ['010', '101', '101', '101', '010'],
   B: ['110', '101', '110', '101', '110'],
   E: ['111', '100', '110', '100', '111'],
+  S: ['111', '100', '111', '001', '111'],
+  N: ['101', '111', '111', '101', '101'],
   Z: ['111', '001', '010', '100', '111'],
   D: ['110', '101', '101', '101', '110'],
   'İ': ['010', '000', '010', '010', '010'],
@@ -115,6 +117,8 @@ const MAX_POPUPS = 24;
 export class CastleRenderer {
   private particles: PooledParticle[];
   private particleCursor = 0;
+  /** Slot of the local player in an online match; gets a "SEN" marker. */
+  public localSlot: number | null = null;
   private popups: FloatingPopup[];
   private popupCursor = 0;
 
@@ -1518,6 +1522,7 @@ export class CastleRenderer {
       const tagY = Math.round(char.y * PSCALE) - 20;
       const label = `${char.isBot ? 'B' : 'O'}${char.slotIndex + 1}`;
       drawBitmapText(ctx, label, cx, tagY, theme.light, 1);
+      if (char.slotIndex === this.localSlot) drawBitmapText(ctx, 'SEN', cx, tagY - 8, '#FDE047', 1);
 
       if (!char.grounded && char.jumpsUsed < char.maxJumps) {
         ctx.fillStyle = '#090E1A';

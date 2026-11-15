@@ -70,6 +70,7 @@ interface MainMenuProps {
   onlinePeerId: string | null;
   onlineError: string | null;
   onlineHasTurn: boolean;
+  onlineJoining: boolean;
   initialRoomCode: string;
   onSetSubView: (view: MenuSubView) => void;
   onUpdateSettings: (patch: Partial<GameSettings>) => void;
@@ -111,6 +112,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   onlinePeerId,
   onlineError,
   onlineHasTurn,
+  onlineJoining,
   initialRoomCode,
   onSetSubView,
   onUpdateSettings,
@@ -359,6 +361,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
             myPeerId={onlinePeerId}
             onlineError={onlineError}
             hasTurn={onlineHasTurn}
+            joining={onlineJoining}
             initialRoomCode={initialRoomCode}
             defaultName={slots[0]?.name ?? 'Pofi'}
             defaultCostume={slots[0]?.costume}

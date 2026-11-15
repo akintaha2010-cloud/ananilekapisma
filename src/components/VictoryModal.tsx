@@ -4,7 +4,7 @@ import { DEFEAT_QUIPS, pickQuip, VICTORY_QUIPS } from '../game/jokes';
 import { getAchievementDef } from '../game/achievements';
 import { HEROES } from '../game/characters';
 import { CHARACTER_COLORS } from '../game/constants';
-import { RoundResult } from '../game/types';
+import { RoundResult, TeamId } from '../game/types';
 import { CharacterPreviewSvg } from './CharacterPreviewSvg';
 
 interface VictoryModalProps {
@@ -15,6 +15,7 @@ interface VictoryModalProps {
   onContinueStory?: () => void;
   onOpenSagaMap?: () => void;
   isOnlineGuest?: boolean;
+  myTeam?: TeamId;
 }
 
 export const VictoryModal: React.FC<VictoryModalProps> = ({
@@ -24,14 +25,15 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   onContinueStory,
   onOpenSagaMap,
   isOnlineGuest = false,
+  myTeam = 'A',
 }) => {
   const [quipSeed] = useState(() => Math.floor(Math.random() * 1000));
   const winner = result.standings.find((p) => p.slotIndex === result.winnerSlot) ?? result.standings[0];
-  const lost = result.winnerTeam === 'B' || ((result.storyChapterId || result.sagaLevelId) && !(result.storyWon || result.sagaWon));
+  const lost = (result.winnerTeam !== null && result.winnerTeam !== undefined && result.winnerTeam !== myTeam) || ((result.storyChapterId || result.sagaLevelId) && !(result.storyWon || result.sagaWon));
   const unlocked = result.unlockedAchievements ?? [];
   const newHeroes = result.leveledUpTo ? HEROES.filter((h) => h.unlockLevel === result.leveledUpTo) : [];
   const title = result.winnerTeam
-    ? result.winnerTeam === 'A'
+    ? result.winnerTeam === myTeam
       ? 'ZAFER!'
       : 'YENİLDİN'
     : winner

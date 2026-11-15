@@ -68,12 +68,31 @@ export interface NetCallbacks {
   onError: (message: string) => void;
   onMatchStarted: (room: OnlineRoomState) => void;
   onGuestInput: (slotIndex: number, input: PlayerInputState) => void;
+  onGuestLeft: (slotIndex: number) => void;
   onSnapshotReceived: (snap: NetSnapshot) => void;
   onMatchEnded: (result: RoundResult) => void;
 }
 
 const ID_PREFIX = 'kalekapmaca-';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const OPEN_TIMEOUT_MS = 10000;
+const JOIN_TIMEOUT_MS = 15000;
+const PING_MS = 2000;
+const DEAD_MS = 10000;
+const DEAD_HIDDEN_MS = 20000; // background tabs get throttled timers
+const MAX_BUFFERED_BYTES = 256 * 1024;
+
+const SERVER_DOWN = 'Bağlantı sunucusuna ulaşılamadı. İnternet bağlantını kontrol et.';
+const PEER_ERRORS: Record<string, string> = {
+  'peer-unavailable': 'Bu davet koduna ait aktif bir oda bulunamadı.',
+  network: SERVER_DOWN,
+  'server-error': SERVER_DOWN,
+  'socket-error': SERVER_DOWN,
+  'socket-closed': SERVER_DOWN,
+  timeout: SERVER_DOWN,
+  webrtc: 'Oyuncular arasında doğrudan bağlantı kurulamadı.',
+};
+const peerErrorText = (type?: string) => PEER_ERRORS[type ?? ''] ?? 'Bağlantı hatası oluştu, tekrar dene.';
 
 function randomCode(): string {
   let code = '';
@@ -86,6 +105,7 @@ type Msg = Record<string, unknown>;
 /**
  * Serverless online play: the host's browser is the room (PeerJS id = prefix + room code),
  * guests connect to it directly over WebRTC. Works on static hosting like GitHub Pages.
+ * The host is authoritative: guests only send inputs and render the host's snapshots.
  */
 export class OnlineClient {
   private peer: Peer | null = null;
@@ -95,6 +115,11 @@ export class OnlineClient {
   private hostConn: DataConnection | null = null;
   private callbacks: NetCallbacks;
   private snapSeq = 0;
+  // Bumped on every leave so late async results / events of an old session are ignored.
+  private gen = 0;
+  private joinSettle: (() => void) | null = null;
+  private lastSeen = new Map<string, number>();
+  private pingTimer: number | null = null;
 
   constructor(callbacks: NetCallbacks) {
     this.callbacks = callbacks;
@@ -120,11 +145,15 @@ export class OnlineClient {
   private openPeer(id?: string): Promise<Peer> {
     return new Promise((resolve, reject) => {
       const peer = id ? new Peer(id) : new Peer();
+      let timer = 0;
       const fail = (err: { type?: string }) => {
+        window.clearTimeout(timer);
         peer.destroy();
         reject(err);
       };
+      timer = window.setTimeout(() => fail({ type: 'timeout' }), OPEN_TIMEOUT_MS);
       peer.once('open', () => {
+        window.clearTimeout(timer);
         peer.off('error', fail);
         resolve(peer);
       });
@@ -132,14 +161,49 @@ export class OnlineClient {
     });
   }
 
-  private watchPeer(peer: Peer) {
+  private watchPeer(peer: Peer, gen: number, onError: (message: string) => void) {
     peer.on('error', (err: { type?: string }) => {
-      if (err.type === 'peer-unavailable') {
-        this.callbacks.onError('Bu davet koduna ait aktif bir oda bulunamadı.');
-      } else if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
-        this.callbacks.onError('Bağlantı sunucusuna ulaşılamadı. İnternetini kontrol et.');
-      }
+      if (gen === this.gen) onError(peerErrorText(err.type));
     });
+    // The broker drops idle signalling sockets; reconnect so the room code keeps working.
+    peer.on('disconnected', () => {
+      window.setTimeout(() => {
+        if (gen === this.gen && peer.disconnected && !peer.destroyed) peer.reconnect();
+      }, 1500);
+    });
+    peer.on('close', () => this.lost(gen, 'Bağlantı sunucusuyla bağlantı kesildi.'));
+  }
+
+  /** Ends the current session with an error message, unless it was already replaced. */
+  private lost(gen: number, message: string) {
+    if (gen !== this.gen) return;
+    this.leaveRoom();
+    this.callbacks.onError(message);
+  }
+
+  private touch(peerId: string) {
+    this.lastSeen.set(peerId, Date.now());
+  }
+
+  // Connections can die silently (closed tab, dropped wifi); detect it with pings.
+  private startKeepAlive(gen: number) {
+    this.stopKeepAlive();
+    this.pingTimer = window.setInterval(() => {
+      const now = Date.now();
+      const watched = this.hostConn ? [this.hostConn] : [...this.conns.values()];
+      for (const conn of watched) {
+        if (conn.open) conn.send({ kind: 'ping' });
+        if (now - (this.lastSeen.get(conn.peer) ?? now) <= (document.hidden ? DEAD_HIDDEN_MS : DEAD_MS)) continue;
+        if (this.hostConn) return this.lost(gen, 'Kurucuyla bağlantı koptu.');
+        conn.close();
+        this.dropGuest(conn.peer);
+      }
+    }, PING_MS);
+  }
+
+  private stopKeepAlive() {
+    if (this.pingTimer !== null) window.clearInterval(this.pingTimer);
+    this.pingTimer = null;
   }
 
   public async createRoom(params: {
@@ -152,6 +216,7 @@ export class OnlineClient {
     botsEnabled: boolean;
   }) {
     this.leaveRoom();
+    const gen = this.gen;
     let peer: Peer | null = null;
     let code = '';
     for (let attempt = 0; attempt < 5 && !peer; attempt++) {
@@ -160,9 +225,13 @@ export class OnlineClient {
         peer = await this.openPeer(ID_PREFIX + code);
       } catch (err) {
         if ((err as { type?: string }).type !== 'unavailable-id') {
-          this.callbacks.onError('Oda açılamadı. İnternet bağlantını kontrol et.');
+          if (gen === this.gen) this.callbacks.onError(peerErrorText((err as { type?: string }).type));
           return;
         }
+      }
+      if (gen !== this.gen) {
+        peer?.destroy();
+        return;
       }
     }
     if (!peer) {
@@ -170,7 +239,7 @@ export class OnlineClient {
       return;
     }
     this.peer = peer;
-    this.watchPeer(peer);
+    this.watchPeer(peer, gen, (message) => this.callbacks.onError(message));
     this.myPeerId = peer.id;
     this.room = {
       code,
@@ -183,28 +252,38 @@ export class OnlineClient {
       inGame: false,
       peers: [{ peerId: peer.id, slotIndex: 0, name: (params.name || 'Kurucu').slice(0, 12), costume: params.costume, isHost: true }],
     };
-    peer.on('connection', (conn) => this.acceptGuest(conn));
+    peer.on('connection', (conn) => this.acceptGuest(conn, gen));
+    this.startKeepAlive(gen);
     this.emitDecoratedRoom();
   }
 
-  private acceptGuest(conn: DataConnection) {
-    conn.on('data', (raw) => this.handleHostMessage(conn, raw as Msg));
-    conn.on('close', () => this.dropGuest(conn.peer));
-    conn.on('error', () => this.dropGuest(conn.peer));
+  private acceptGuest(conn: DataConnection, gen: number) {
+    this.touch(conn.peer);
+    conn.on('data', (raw) => {
+      if (gen !== this.gen) return;
+      this.touch(conn.peer);
+      this.handleHostMessage(conn, raw as Msg);
+    });
+    conn.on('close', () => gen === this.gen && this.dropGuest(conn.peer));
+    conn.on('error', () => gen === this.gen && this.dropGuest(conn.peer));
   }
 
   private dropGuest(peerId: string) {
     this.conns.delete(peerId);
+    this.lastSeen.delete(peerId);
     if (!this.room) return;
-    const before = this.room.peers.length;
+    const gone = this.room.peers.find((p) => p.peerId === peerId);
+    if (!gone) return;
     this.room.peers = this.room.peers.filter((p) => p.peerId !== peerId);
-    if (this.room.peers.length !== before) this.broadcastRoom();
+    if (this.room.inGame) this.callbacks.onGuestLeft(gone.slotIndex);
+    this.broadcastRoom();
   }
 
   private handleHostMessage(conn: DataConnection, msg: Msg) {
     const room = this.room;
     if (!room || !msg || typeof msg !== 'object') return;
     if (msg.kind === 'join') {
+      if (room.peers.some((p) => p.peerId === conn.peer)) return;
       const reject = (message: string) => {
         conn.send({ kind: 'error', message });
         setTimeout(() => conn.close(), 300);
@@ -237,38 +316,63 @@ export class OnlineClient {
     }
   }
 
-  public async joinRoom(params: { roomCode: string; name: string; costume: CostumeConfig }) {
+  /** Resolves once the guest is in the room or the attempt failed (errors go to onError). */
+  public joinRoom(params: { roomCode: string; name: string; costume: CostumeConfig }): Promise<void> {
     this.leaveRoom();
+    const gen = this.gen;
     const code = params.roomCode.trim().toUpperCase();
-    let peer: Peer;
-    try {
-      peer = await this.openPeer();
-    } catch {
-      this.callbacks.onError('Bağlantı sunucusuna ulaşılamadı. İnternetini kontrol et.');
-      return;
-    }
-    this.peer = peer;
-    this.watchPeer(peer);
-    const conn = peer.connect(ID_PREFIX + code, { reliable: true, serialization: 'json' });
-    this.hostConn = conn;
-    conn.on('open', () => conn.send({ kind: 'join', name: params.name, costume: params.costume }));
-    conn.on('data', (raw) => this.handleGuestMessage(raw as Msg));
-    conn.on('close', () => {
-      if (this.hostConn !== conn) return;
-      const hadRoom = Boolean(this.room);
-      this.resetLocal();
-      if (hadRoom) this.callbacks.onError('Oda kapandı: kurucu oyundan ayrıldı.');
+    return new Promise<void>((resolve) => {
+      const timer = window.setTimeout(
+        () => this.lost(gen, 'Odaya bağlanılamadı. Kodu ve kurucunun odada olduğunu kontrol et.'),
+        JOIN_TIMEOUT_MS
+      );
+      this.joinSettle = () => {
+        window.clearTimeout(timer);
+        this.joinSettle = null;
+        resolve();
+      };
+      this.openPeer().then(
+        (peer) => {
+          if (gen !== this.gen) {
+            peer.destroy();
+            return;
+          }
+          this.peer = peer;
+          // After joining, broker hiccups must not kill a running P2P match.
+          this.watchPeer(peer, gen, (message) =>
+            this.joinSettle ? this.lost(gen, message) : this.callbacks.onError(message)
+          );
+          const conn = peer.connect(ID_PREFIX + code, { reliable: true, serialization: 'json' });
+          this.hostConn = conn;
+          conn.on('open', () => {
+            this.touch(conn.peer);
+            conn.send({ kind: 'join', name: params.name, costume: params.costume });
+          });
+          conn.on('data', (raw) => {
+            if (gen !== this.gen) return;
+            this.touch(conn.peer);
+            this.handleGuestMessage(gen, raw as Msg);
+          });
+          conn.on('close', () =>
+            this.lost(gen, this.room ? 'Oda kapandı: kurucu oyundan ayrıldı.' : 'Odaya bağlanılamadı.')
+          );
+          conn.on('error', () => this.lost(gen, 'Kurucuyla doğrudan bağlantı kurulamadı.'));
+        },
+        (err: { type?: string }) => this.lost(gen, peerErrorText(err.type))
+      );
     });
   }
 
-  private handleGuestMessage(msg: Msg) {
+  private handleGuestMessage(gen: number, msg: Msg) {
     if (!msg || typeof msg !== 'object') return;
     if (msg.kind === 'error') {
-      this.callbacks.onError(String(msg.message || 'Oda hatası oluştu.'));
+      this.lost(gen, String(msg.message || 'Oda hatası oluştu.'));
     } else if (msg.kind === 'joined') {
       this.myPeerId = String(msg.peerId);
       this.room = msg.room as OnlineRoomState;
+      this.startKeepAlive(gen);
       this.emitDecoratedRoom();
+      this.joinSettle?.();
     } else if (msg.kind === 'room') {
       this.room = msg.room as OnlineRoomState;
       this.emitDecoratedRoom();
@@ -314,7 +418,7 @@ export class OnlineClient {
   }
 
   public startMatch() {
-    if (!this.isHost() || !this.room) return;
+    if (!this.isHost() || !this.room || this.room.inGame) return;
     this.room.inGame = true;
     this.broadcastRoom();
     this.broadcastToGuests({ kind: 'match_started', room: this.room });
@@ -328,17 +432,22 @@ export class OnlineClient {
   }
 
   private resetLocal() {
+    this.stopKeepAlive();
+    this.lastSeen.clear();
     this.hostConn = null;
     this.conns.clear();
     this.room = null;
     this.myPeerId = null;
     const peer = this.peer;
     this.peer = null;
-    peer?.destroy();
+    // Give the "close" frames a moment to reach the other side before the peer is torn down.
+    if (peer) window.setTimeout(() => peer.destroy(), 200);
     this.callbacks.onRoomUpdated(null, null);
   }
 
   public leaveRoom() {
+    this.gen++;
+    this.joinSettle?.();
     if (!this.peer && !this.room) return;
     const conn = this.hostConn;
     this.hostConn = null;
@@ -383,7 +492,10 @@ export class OnlineClient {
 
   private broadcastToGuests(payload: Msg) {
     for (const conn of this.conns.values()) {
-      if (conn.open) conn.send(payload);
+      if (!conn.open) continue;
+      // Slow link: drop stale snapshots instead of queueing them up (the next one replaces it).
+      if (payload.kind === 'snapshot' && (conn.dataChannel?.bufferedAmount ?? 0) > MAX_BUFFERED_BYTES) continue;
+      conn.send(payload);
     }
   }
 
@@ -458,6 +570,30 @@ export class OnlineClient {
   }
 }
 
+// Snapshots arrive ~30 times a second; entities glide to the latest position instead of jumping.
+const netTargets = new WeakMap<object, { x: number; y: number }>();
+
+function setNetTarget(o: { x: number; y: number }, x: number, y: number) {
+  const t = netTargets.get(o);
+  if (!t || Math.hypot(x - o.x, y - o.y) > 160) {
+    o.x = x;
+    o.y = y;
+  }
+  netTargets.set(o, { x, y });
+}
+
+export function smoothNetState(sim: SimulationState, dt: number) {
+  const k = 1 - Math.exp(-dt * 28);
+  const glide = (o: { x: number; y: number }) => {
+    const t = netTargets.get(o);
+    if (!t) return;
+    o.x += (t.x - o.x) * k;
+    o.y += (t.y - o.y) * k;
+  };
+  sim.players.forEach(glide);
+  sim.platforms.forEach(glide);
+}
+
 export function applyNetSnapshot(sim: SimulationState, snap: NetSnapshot) {
   sim.countdown = snap.countdown ?? 0;
   sim.elapsedSec = snap.elapsedSec;
@@ -477,14 +613,15 @@ export function applyNetSnapshot(sim: SimulationState, snap: NetSnapshot) {
   for (const pSnap of snap.players) {
     const p = sim.players.find((pl) => pl.slotIndex === pSnap.slotIndex);
     if (!p) continue;
-    Object.assign(p, pSnap);
+    const { x, y, ...rest } = pSnap;
+    Object.assign(p, rest);
+    setNetTarget(p, x, y);
   }
 
   for (const plSnap of snap.platforms) {
     const pl = sim.platforms.find((x) => x.id === plSnap.id);
     if (!pl) continue;
-    pl.x = plSnap.x;
-    pl.y = plSnap.y;
+    setNetTarget(pl, plSnap.x, plSnap.y);
     pl.crumbleState = plSnap.crumbleState;
   }
 
