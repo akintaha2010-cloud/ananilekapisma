@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CostumeConfig, HeroId, HumanLookId } from '../game/types';
 import { CutsceneLine, CutsceneSpeaker, HAVEN_CAST, ORFE_COSTUME, PASA_COSTUME } from '../game/adventure';
 import { CharacterPreviewSvg } from './CharacterPreviewSvg';
+import { HavenPortrait } from './HavenPortrait';
+
+const HAVEN_PORTRAIT = new Set<string>(['devin', 'ozgur', 'mert', 'tuna', 'ayaz', 'gokoz', 'buglord']);
 
 interface AdventureCutsceneProps {
   title: string;
@@ -107,7 +110,11 @@ export const AdventureCutscene: React.FC<AdventureCutsceneProps> = ({ title, lin
         className={`flex flex-col items-center transition-all duration-300 ${active ? 'opacity-100 -translate-y-3 scale-110' : 'opacity-45 scale-95'}`}
         style={{ transform: c.side === 'right' ? 'scaleX(-1)' : undefined }}
       >
+        {HAVEN_PORTRAIT.has(key) || c.look === 'akin' ? (
+          <HavenPortrait who={key === 'hero' ? 'akin' : key} size={BIG.has(key) ? 190 : 150} active={active && !typing} />
+        ) : (
         <CharacterPreviewSvg costume={c.costume} heroId={c.heroId} look={c.look} size={BIG.has(key) ? 190 : 150} celebrating={active && !typing} />
+        )}
       </div>
     );
   };

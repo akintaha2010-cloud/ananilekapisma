@@ -8,7 +8,7 @@
     "build": "vite build && node scripts/publish.mjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "test": "tsx --test src/game/rules.test.ts"
+    "test": "tsx --test src/game/rules.test.ts src/haven/haven.test.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

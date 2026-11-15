@@ -42,7 +42,8 @@ export type CharacterColorId =
   | 'tangerine'
   | 'turquoise'
   | 'gold_pasha'
-  | 'shadow_obsidian';
+  | 'shadow_obsidian'
+  | 'kirpi';
 
 export type FesStyleId =
   | 'klasik_fes'

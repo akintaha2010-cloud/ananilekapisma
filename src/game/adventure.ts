@@ -65,7 +65,7 @@ export const PASA_COSTUME: CostumeConfig = {
 };
 
 export const HAVEN_CAST = {
-  devin: { look: 'devin' as HumanLookId, name: 'Devin', heroId: 'zeynep' as HeroId, costume: { colorId: 'turquoise', fesStyle: 'denizci_bere', mustacheStyle: 'cember', accessoryId: 'kanat' } as CostumeConfig },
+  devin: { look: undefined as HumanLookId | undefined, name: 'Devin', heroId: 'pofi' as HeroId, costume: { colorId: 'kirpi', fesStyle: 'klasik_fes', mustacheStyle: 'kaytan', accessoryId: 'yok' } as CostumeConfig },
   ozgur: { look: 'ozgur' as HumanLookId, name: 'Prenses Özgür', heroId: 'leyla' as HeroId, costume: { colorId: 'plum', fesStyle: 'sultan_taci', mustacheStyle: 'kaytan', accessoryId: 'pelerin' } as CostumeConfig },
   mert: { look: 'mert' as HumanLookId, name: 'Mert', heroId: 'tiknaz' as HeroId, costume: { colorId: 'crimson', fesStyle: 'altin_migfer', mustacheStyle: 'pala', accessoryId: 'kalkan' } as CostumeConfig },
   tuna: { look: 'tuna' as HumanLookId, name: 'Tuna', heroId: 'kizil_bey' as HeroId, costume: { colorId: 'tangerine', fesStyle: 'saray_kavuk', mustacheStyle: 'burgu', accessoryId: 'pelerin' } as CostumeConfig },

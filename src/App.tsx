@@ -22,6 +22,7 @@ import {
   saveAdventureProgress,
 } from './game/adventure';
 import { applyScrollLevel, buildScrollLevel } from './game/scroll';
+import { HavenGame } from './components/HavenGame';
 import { AdventureCutscene } from './components/AdventureCutscene';
 import { soundEngine } from './game/audio';
 import {
@@ -293,6 +294,7 @@ export default function App() {
   );
   const activeAdventureRef = useRef<AdventureChapter | null>(null);
   const [adventureProgress, setAdventureProgress] = useState<AdventureProgress>(() => loadAdventureProgress());
+  const [havenChapter, setHavenChapter] = useState<AdventureChapter | null>(null);
   const [cutscene, setCutscene] = useState<{ title: string; lines: CutsceneLine[]; onDone: () => void } | null>(null);
   const activeStoryRef = useRef<{
     chapter: StoryChapterDef;
@@ -802,7 +804,8 @@ export default function App() {
         lines: chapter.intro,
         onDone: () => {
           setCutscene(null);
-          startLocalGame(true);
+          if (chapter.campaign === 'haven') setHavenChapter(chapter);
+          else startLocalGame(true);
         },
       });
     },
@@ -1418,6 +1421,34 @@ export default function App() {
           }}
           onMainMenu={returnToMainMenu}
           onQuit={handleQuitApp}
+        />
+      )}
+
+      {havenChapter && (
+        <HavenGame
+          key={havenChapter.id}
+          chapterId={havenChapter.id}
+          onExit={() => {
+            setHavenChapter(null);
+            activeAdventureRef.current = null;
+          }}
+          onWin={() => {
+            const ch = havenChapter;
+            setAdventureProgress((prev) => {
+              const next = { completed: Array.from(new Set([...prev.completed, ch.id])) };
+              saveAdventureProgress(next);
+              return next;
+            });
+            setCutscene({
+              title: ch.title,
+              lines: ch.outro,
+              onDone: () => {
+                setCutscene(null);
+                activeAdventureRef.current = null;
+              },
+            });
+            setHavenChapter(null);
+          }}
         />
       )}
 

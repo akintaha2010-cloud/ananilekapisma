@@ -140,6 +140,15 @@ export const CHARACTER_COLORS: Record<CharacterColorId, ColorTheme> = {
     light: '#A5B4FC',
     unlockHint: 'Hikâye 5. Bölüm (Gölge Kalesi) ödülü',
   },
+  kirpi: {
+    id: 'kirpi',
+    label: 'Kirpi Kahvesi',
+    primary: '#B07A4F',
+    secondary: '#8A5A36',
+    trim: '#F5DEB3',
+    dark: '#4A2E1A',
+    light: '#D9A877',
+  },
 };
 
 export const CHARACTER_COLOR_LIST: ColorTheme[] = Object.values(CHARACTER_COLORS);
