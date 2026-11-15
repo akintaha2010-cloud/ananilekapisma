@@ -1,4 +1,4 @@
-import { buildAdventureEnemySlot } from './adventure';
+import { ADVENTURE_ENEMY_HP, buildAdventureEnemySlot, isAdventureBoss } from './adventure';
 import { getHeroDef } from './characters';
 import {
   ARENA_HEIGHT,
@@ -1170,7 +1170,6 @@ export function stepSimulation(
   evaluateWinCondition(sim);
 }
 
-const ADVENTURE_ENEMY_HP = { knight: 2, mage: 1, shadow: 2, boss: 8 } as const;
 
 export function spawnAdventureWave(sim: SimulationState) {
   const adv = sim.adventure;
@@ -1186,11 +1185,13 @@ export function spawnAdventureWave(sim: SimulationState) {
     foe.y = -60 - i * 40;
     foe.vy = 0;
     foe.facing = foe.x > ARENA_WIDTH / 2 ? -1 : 1;
-    if (kind === 'boss') {
+    if (isAdventureBoss(kind)) {
       foe.w = Math.round(PHYSICS.CHAR_WIDTH * 1.5);
       foe.h = Math.round(PHYSICS.CHAR_HEIGHT * 1.5);
       foe.x = ARENA_WIDTH / 2 - foe.w / 2;
       adv.bossSlot = foe.slotIndex;
+      adv.bossName = foe.name;
+      adv.bossMaxHp = ADVENTURE_ENEMY_HP[kind];
     }
     adv.hp[foe.slotIndex] = ADVENTURE_ENEMY_HP[kind];
     sim.players.push(foe);
@@ -1202,7 +1203,7 @@ export function spawnAdventureWave(sim: SimulationState) {
       color: CHARACTER_COLORS[foe.costume.colorId].primary,
     });
   });
-  sim.trauma = Math.min(1, sim.trauma + (wave.includes('boss') ? 0.8 : 0.35));
+  sim.trauma = Math.min(1, sim.trauma + (wave.some(isAdventureBoss) ? 0.8 : 0.35));
 }
 
 function updateAdventure(sim: SimulationState, dt: number) {
@@ -1293,7 +1294,7 @@ export function buildHudSnapshot(sim: SimulationState): HudSnapshot {
             sim.players.filter((p) => p.team === 'B' && !p.eliminated).length
           }${
             sim.adventure.bossSlot !== null && (sim.adventure.hp[sim.adventure.bossSlot] ?? 0) > 0
-              ? ` · Kara Paşa: ${sim.adventure.hp[sim.adventure.bossSlot]}/8`
+              ? ` · ${sim.adventure.bossName ?? 'Boss'}: ${sim.adventure.hp[sim.adventure.bossSlot]}/${sim.adventure.bossMaxHp ?? 8}`
               : ''
           }`
         : storyObjective,

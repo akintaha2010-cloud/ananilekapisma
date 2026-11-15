@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_SETTINGS, DEFAULT_SLOTS } from './constants';
-import { createSimulation, stepSimulation, buildRoundResult } from './physics';
+import { createSimulation, stepSimulation, buildRoundResult, spawnAdventureWave, buildHudSnapshot } from './physics';
 import { computeBotInput } from './ai';
 import { evaluateLiveAchievements, evaluateRoundEndAchievements } from './achievements';
 import { computeLevelFromXp } from './characters';
@@ -434,6 +434,36 @@ test('adventure mode: enemy waves drop in one after another and the chapter reso
       assert.ok(boss.w > 40);
     }
   }
+});
+
+test('haven ankara campaign: Akın leads, story allies join, organizer bosses spawn big', async () => {
+  const { chaptersOf, buildAdventureAllySlots, createAdventureState, isAdventureChapterUnlocked, isAdventureBoss } = await import('./adventure');
+  const haven = chaptersOf('haven');
+  assert.equal(haven.length, 6);
+  assert.equal(isAdventureChapterUnlocked({ completed: [] }, 101), true);
+  assert.equal(isAdventureChapterUnlocked({ completed: [] }, 102), false);
+  assert.equal(isAdventureChapterUnlocked({ completed: [101] }, 102), true);
+  const bosses = haven.flatMap((c) => c.waves.flat()).filter(isAdventureBoss);
+  assert.deepEqual(bosses, ['mert', 'tuna', 'ayaz', 'gokoz', 'buglord']);
+  const allies = buildAdventureAllySlots(DEFAULT_SLOTS, haven[5]);
+  assert.equal(allies[0].heroId, 'akin');
+  assert.equal(allies[0].name, 'Akın');
+  assert.ok(allies.length <= 4);
+  assert.ok(allies.some((a) => a.name === 'Devin'));
+  assert.ok(allies.every((a) => a.team === 'A'));
+  const mert = haven[1];
+  const sim = createSimulation(
+    { ...DEFAULT_SETTINGS, mode: 'adventure', mapId: mert.mapId, lives: mert.lives, botsEnabled: true },
+    buildAdventureAllySlots(DEFAULT_SLOTS, mert)
+  );
+  sim.adventure = createAdventureState(mert);
+  sim.adventure.waveIdx = 1;
+  spawnAdventureWave(sim);
+  const boss = sim.players.find((p) => p.slotIndex === sim.adventure!.bossSlot)!;
+  assert.equal(boss.name, 'Mert');
+  assert.ok(boss.w > 40);
+  assert.equal(sim.adventure.bossMaxHp, 6);
+  assert.match(buildHudSnapshot(sim).storyObjective ?? '', /Mert: 6\/6/);
 });
 
 test('jokes and Hack Club secret codes', async () => {

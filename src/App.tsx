@@ -1424,8 +1424,9 @@ export default function App() {
           key={cutscene.title + cutscene.lines[0]?.text}
           title={cutscene.title}
           lines={cutscene.lines}
-          heroName={slots[0]?.name || 'Kahraman'}
+          heroName={activeAdventureRef.current?.campaign === 'haven' ? 'Akın' : slots[0]?.name || 'Kahraman'}
           heroCostume={slots[0]?.costume ?? DEFAULT_SLOTS[0].costume}
+          heroId={activeAdventureRef.current?.campaign === 'haven' ? 'akin' : slots[0]?.heroId}
           onDone={cutscene.onDone}
         />
       )}

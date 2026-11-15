@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CostumeConfig } from '../game/types';
-import { CutsceneLine, CutsceneSpeaker, ORFE_COSTUME, PASA_COSTUME } from '../game/adventure';
+import { CostumeConfig, HeroId } from '../game/types';
+import { CutsceneLine, CutsceneSpeaker, HAVEN_CAST, ORFE_COSTUME, PASA_COSTUME } from '../game/adventure';
 import { CharacterPreviewSvg } from './CharacterPreviewSvg';
 
 interface AdventureCutsceneProps {
@@ -8,10 +8,22 @@ interface AdventureCutsceneProps {
   lines: CutsceneLine[];
   heroName: string;
   heroCostume: CostumeConfig;
+  heroId?: HeroId;
   onDone: () => void;
 }
 
-const SPEAKERS: Record<Exclude<CutsceneSpeaker, 'hero'>, { name: string; costume: CostumeConfig; side: 'left' | 'right' }> = {
+type Actor = { name: string; costume: CostumeConfig; side: 'left' | 'right'; heroId?: HeroId };
+const BIG = new Set<CutsceneSpeaker>(['pasa', 'mert', 'tuna', 'ayaz', 'gokoz', 'buglord']);
+const cast = (k: keyof typeof HAVEN_CAST, side: 'left' | 'right'): Actor => ({ ...HAVEN_CAST[k], side });
+
+const SPEAKERS: Record<Exclude<CutsceneSpeaker, 'hero' | 'npc'>, Actor> = {
+  devin: cast('devin', 'left'),
+  ozgur: cast('ozgur', 'right'),
+  mert: cast('mert', 'right'),
+  tuna: cast('tuna', 'right'),
+  ayaz: cast('ayaz', 'right'),
+  gokoz: cast('gokoz', 'right'),
+  buglord: cast('buglord', 'right'),
   orfe: { name: 'Orfe', costume: ORFE_COSTUME, side: 'left' },
   pasa: { name: 'Kara Paşa', costume: PASA_COSTUME, side: 'right' },
   knight: {
@@ -26,7 +38,7 @@ const SPEAKERS: Record<Exclude<CutsceneSpeaker, 'hero'>, { name: string; costume
   },
 };
 
-export const AdventureCutscene: React.FC<AdventureCutsceneProps> = ({ title, lines, heroName, heroCostume, onDone }) => {
+export const AdventureCutscene: React.FC<AdventureCutsceneProps> = ({ title, lines, heroName, heroCostume, heroId, onDone }) => {
   const [idx, setIdx] = useState(0);
   const [shown, setShown] = useState(0);
   const line = lines[Math.min(idx, lines.length - 1)];
@@ -77,16 +89,17 @@ export const AdventureCutscene: React.FC<AdventureCutsceneProps> = ({ title, lin
 
   if (!line) return null;
 
-  const cast = new Map<CutsceneSpeaker, { name: string; costume: CostumeConfig; side: 'left' | 'right' }>();
+  const actors = new Map<CutsceneSpeaker, Actor>();
   for (const l of lines) {
-    if (cast.has(l.speaker)) continue;
-    cast.set(l.speaker, l.speaker === 'hero' ? { name: heroName, costume: heroCostume, side: 'left' } : SPEAKERS[l.speaker]);
+    if (actors.has(l.speaker) || l.speaker === 'npc') continue;
+    actors.set(l.speaker, l.speaker === 'hero' ? { name: heroName, costume: heroCostume, side: 'left', heroId } : SPEAKERS[l.speaker]);
   }
-  const speaker = cast.get(line.speaker)!;
-  const left = [...cast.entries()].filter(([, c]) => c.side === 'left');
-  const right = [...cast.entries()].filter(([, c]) => c.side === 'right');
+  const narrator = line.speaker === 'npc';
+  const speaker: Actor = narrator ? { name: '', costume: heroCostume, side: 'left' } : actors.get(line.speaker)!;
+  const left = [...actors.entries()].filter(([, c]) => c.side === 'left');
+  const right = [...actors.entries()].filter(([, c]) => c.side === 'right');
 
-  const renderActor = ([key, c]: [CutsceneSpeaker, { name: string; costume: CostumeConfig; side: 'left' | 'right' }]) => {
+  const renderActor = ([key, c]: [CutsceneSpeaker, Actor]) => {
     const active = key === line.speaker;
     return (
       <div
@@ -94,7 +107,7 @@ export const AdventureCutscene: React.FC<AdventureCutsceneProps> = ({ title, lin
         className={`flex flex-col items-center transition-all duration-300 ${active ? 'opacity-100 -translate-y-3 scale-110' : 'opacity-45 scale-95'}`}
         style={{ transform: c.side === 'right' ? 'scaleX(-1)' : undefined }}
       >
-        <CharacterPreviewSvg costume={c.costume} size={key === 'pasa' ? 190 : 150} celebrating={active && !typing} />
+        <CharacterPreviewSvg costume={c.costume} heroId={c.heroId} size={BIG.has(key) ? 190 : 150} celebrating={active && !typing} />
       </div>
     );
   };
@@ -132,7 +145,7 @@ export const AdventureCutscene: React.FC<AdventureCutsceneProps> = ({ title, lin
           <div className={`font-display font-bold text-sm mb-1 ${speaker.side === 'left' ? 'text-sky-300' : 'text-rose-300 text-right'}`}>
             {speaker.name}
           </div>
-          <p className="text-amber-50 text-base md:text-lg leading-snug">
+          <p className={`text-base md:text-lg leading-snug ${narrator ? 'text-slate-300 italic text-center' : 'text-amber-50'}`}>
             {full.slice(0, shown)}
             {typing && <span className="animate-pulse">▌</span>}
           </p>

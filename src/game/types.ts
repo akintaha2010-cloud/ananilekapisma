@@ -268,7 +268,17 @@ export interface GameEvent {
   points?: number;
 }
 
-export type AdventureEnemyKind = 'knight' | 'mage' | 'shadow' | 'boss';
+export type AdventureEnemyKind =
+  | 'knight'
+  | 'mage'
+  | 'shadow'
+  | 'boss'
+  | 'bug'
+  | 'mert'
+  | 'tuna'
+  | 'ayaz'
+  | 'gokoz'
+  | 'buglord';
 
 export interface AdventureState {
   chapterId: number;
@@ -276,6 +286,8 @@ export interface AdventureState {
   waveIdx: number;
   waveDelay: number;
   bossSlot: number | null;
+  bossName?: string;
+  bossMaxHp?: number;
   nextSlot: number;
   victoryText: string;
   hp: Record<number, number>;
