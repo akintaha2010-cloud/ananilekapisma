@@ -23,6 +23,7 @@ import {
 } from './game/adventure';
 import { applyScrollLevel, buildScrollLevel } from './game/scroll';
 import { HavenGame } from './components/HavenGame';
+import { SplashIntro } from './components/SplashIntro';
 import { AdventureCutscene } from './components/AdventureCutscene';
 import { soundEngine } from './game/audio';
 import {
@@ -48,6 +49,7 @@ import {
 import { CastleRenderer } from './game/renderer';
 import {
   computeSagaStarsEarned,
+  applySagaLevelCompletion,
   loadSagaProgress,
   SAGA_LEVELS,
   saveSagaProgress,
@@ -273,6 +275,10 @@ export default function App() {
   const [settings, setSettings] = useState<GameSettings>(initial.current.settings);
   const [slots, setSlots] = useState<PlayerSlotConfig[]>(initial.current.slots);
   const [screenState, setScreenState] = useState<AppScreenState>('title');
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    const q = new URLSearchParams(window.location.search);
+    return q.get('autostart') !== '1' && !q.get('room') && !sessionStorage.getItem('kk_splash_seen');
+  });
   const [menuSubView, setMenuSubView] = useState<MenuSubView>(
     urlRoomParam.current ? 'online' : 'home'
   );
@@ -518,21 +524,8 @@ export default function App() {
           const levelId = rawResult.sagaLevelId;
           const levelDef = SAGA_LEVELS.find((l) => l.id === levelId);
           sagaBonusXp = levelDef?.rewardXp ?? 80;
-          setSagaProgress((prev) => {
-            const prevStars = prev.starsByLevel[levelId] ?? 0;
-            const nextStars = Math.max(prevStars, sagaStars ?? 1) as 1 | 2 | 3;
-            return {
-              ...prev,
-              highestUnlockedLevel: Math.max(
-                prev.highestUnlockedLevel,
-                Math.min(SAGA_LEVELS.length, levelId + 1)
-              ),
-              starsByLevel: {
-                ...prev.starsByLevel,
-                [levelId]: nextStars,
-              },
-            };
-          });
+          const earnedStars = Math.max(1, sagaStars ?? 1) as 1 | 2 | 3;
+          setSagaProgress((prev) => applySagaLevelCompletion(prev, levelId, earnedStars));
         }
       }
 
@@ -1421,6 +1414,15 @@ export default function App() {
           }}
           onMainMenu={returnToMainMenu}
           onQuit={handleQuitApp}
+        />
+      )}
+
+      {showSplash && screenState === 'title' && (
+        <SplashIntro
+          onComplete={() => {
+            sessionStorage.setItem('kk_splash_seen', '1');
+            setShowSplash(false);
+          }}
         />
       )}
 

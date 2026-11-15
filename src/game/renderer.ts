@@ -125,6 +125,13 @@ export class CastleRenderer {
   private bgCacheMap: MapId | '' = '';
   private skyCache: HTMLCanvasElement;
   private skyCacheCtx: CanvasRenderingContext2D;
+  private atmosphericParticles = Array.from({ length: 55 }, (_, i) => ({
+    x: (i * 31) % PW,
+    y: (i * 19) % PH,
+    size: i % 4 === 0 ? 2 : 1,
+    alpha: 0.08 + ((i * 37) % 17) / 100,
+    driftFreq: 0.8 + ((i * 13) % 15) / 10,
+  }));
   private camX = PW / 2;
   private camY = PH / 2;
   private camZoom = 1;
@@ -424,6 +431,7 @@ export class CastleRenderer {
     let sx = 0;
     let sy = 0;
     let wsum = 0;
+    let humans = 0;
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
@@ -432,7 +440,8 @@ export class CastleRenderer {
       if (!p.alive || p.eliminated) continue;
       const cx = (p.x + p.w / 2 - sim.scrollX) * k;
       const cy = (p.y + p.h / 2) * k;
-      const w = p.isBot ? 1 : 2.5;
+      const w = p.isBot ? 0.6 : 4;
+      if (!p.isBot) humans++;
       sx += cx * w;
       sy += cy * w;
       wsum += w;
@@ -447,10 +456,10 @@ export class CastleRenderer {
     if (!attractMode && wsum > 0) {
       tx = sx / wsum;
       ty = sy / wsum + 18;
-      const spread = Math.max((maxX - minX + 120) / PW, (maxY - minY + 90) / PH);
-      tz = Math.max(1.04, Math.min(1.24, 1 / Math.max(0.5, spread)));
+      const spread = humans > 0 ? 1 / 1.4 : Math.max((maxX - minX + 120) / PW, (maxY - minY + 90) / PH);
+      tz = Math.max(1.18, Math.min(1.5, 1 / Math.max(0.5, spread)));
     }
-    const a = 1 - Math.exp(-dt * 2.6);
+    const a = 1 - Math.exp(-dt * 4.2);
     this.camZoom += (tz - this.camZoom) * a;
     const halfW = PW / this.camZoom / 2;
     const halfH = PH / this.camZoom / 2;
@@ -499,6 +508,7 @@ export class CastleRenderer {
 
     // 2. Animated pixel scenery (clouds, birds, torches, flags)
     this.drawPixelAnimatedScenery(pctx, sim, timeSec);
+    this.drawAtmosphericFog(pctx, timeSec);
 
     // 3. Wind streaks if windy hazard
     if (sim.windForce !== 0) {
@@ -1838,6 +1848,18 @@ export class CastleRenderer {
       const alpha = Math.min(1, (pop.life / pop.maxLife) * 1.6);
       ctx.globalAlpha = alpha;
       drawBitmapText(ctx, pop.text, Math.round(pop.x), Math.round(pop.y), pop.color, 2);
+    }
+    ctx.restore();
+  }
+
+  private drawAtmosphericFog(ctx: CanvasRenderingContext2D, timeSec: number) {
+    ctx.save();
+    ctx.fillStyle = '#FEF3C7';
+    for (const ap of this.atmosphericParticles) {
+      const px = ap.x + Math.sin(timeSec * ap.driftFreq + ap.y * 0.05) * 6;
+      const py = ap.y - timeSec * 3 * ap.driftFreq + Math.cos(timeSec * 0.8 + ap.x * 0.05) * 4;
+      ctx.globalAlpha = Math.max(0, Math.min(1, ap.alpha * (0.6 + 0.4 * Math.sin(timeSec * 1.8 + ap.x))));
+      ctx.fillRect(Math.round(((px % PW) + PW) % PW), Math.round(((py % PH) + PH) % PH), ap.size, ap.size);
     }
     ctx.restore();
   }
